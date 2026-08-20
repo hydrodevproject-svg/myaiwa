@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MYAIWA - GPS ATTENDANCE, FAST MAP ENGINE & EARLY CHECK-OUT (FIXED MAP TILES)
+   MYAIWA - GPS ATTENDANCE, REALTIME ATTENDANCE OBSERVER & EARLY CHECK-OUT
    MYAIWA - AIWA RAGIN JAJE SYSTEM
    ========================================================================== */
 
@@ -11,6 +11,7 @@ import {
   getDoc, 
   setDoc, 
   deleteDoc, 
+  onSnapshot,
   serverTimestamp, 
   query, 
   where 
@@ -38,8 +39,12 @@ import {
 
 import { navigateToEmployeePickerPage } from "./hr-management.js";
 
+// Penampung unsubscribe listener realtime absensi
+let unsubscribeTodayAttendance = null;
+let unsubscribeAttendanceHistory = null;
+
 // ==========================================
-// 1. TILE STYLE MAPLIBRE (STABIL, CEPAT & BEBAS 404)
+// 1. TILE STYLE MAPLIBRE (STABIL & CEPAT)
 // ==========================================
 const FAST_LIGHT_MAP_STYLE = {
   version: 8,
@@ -238,7 +243,6 @@ export function initMapLibre() {
       attributionControl: false
     });
 
-    // Marker Outlet Toko AIWA
     new maplibregl.Marker({ color: '#1A4B8B' })
       .setLngLat([MERCHANT_LOCATION.lng, MERCHANT_LOCATION.lat])
       .setPopup(new maplibregl.Popup().setHTML("<b>AIWA RAGIN JAJE</b><br>Jl. Pendidikan No.28, Aikmel"))
@@ -417,7 +421,6 @@ export async function executeGPSAttendance() {
       notify("Sukses", `Check-Out berhasil pada pukul ${timeStr}`);
     }
     
-    await checkTodayAttendance();
     if (window.calculateUserKPI) {
       await window.calculateUserKPI(user.uid);
     }
@@ -485,7 +488,6 @@ export async function submitEarlyLeaveRequest(e) {
     );
 
     navigateToTab('absensi');
-    await checkTodayAttendance();
   } catch (err) {
     hideLoading();
     notify("Gagal Simpan", err.message);
@@ -493,13 +495,13 @@ export async function submitEarlyLeaveRequest(e) {
 }
 
 // ==========================================
-// 8. STATUS PRESENSI HARI INI
+// 8. REALTIME OBSERVER PRESENSI HARI INI & RIWAYAT
 // ==========================================
-export async function checkTodayAttendance() {
+export function checkTodayAttendance() {
   const user = auth.currentUser;
   if (!user) return;
+
   const { todayStr, isDayOff, activeShift, activeMode } = resolveTodayEmployeeShiftAndMode();
-  
   const btnAbsen = document.getElementById("btn-trigger-attendance");
   const checkinEl = document.getElementById("today-checkin-time");
   const checkoutEl = document.getElementById("today-checkout-time");
@@ -509,11 +511,14 @@ export async function checkTodayAttendance() {
     badgeShiftMode.innerText = isDayOff ? "LIBUR MINGGUAN" : `SHIFT ${activeShift.toUpperCase()} · MODE ${activeMode.toUpperCase()}`;
   }
 
+  // Bersihkan listener lama jika ada
+  if (unsubscribeTodayAttendance) unsubscribeTodayAttendance();
+
   const docUniqueId = `${user.uid}_${todayStr}`;
+  const docRef = doc(db, "attendance", docUniqueId);
 
-  try {
-    const docSnap = await getDoc(doc(db, "attendance", docUniqueId));
-
+  // Pasang Listener Real-time
+  unsubscribeTodayAttendance = onSnapshot(docRef, (docSnap) => {
     if (docSnap.exists()) {
       const data = docSnap.data();
       if (checkinEl) checkinEl.innerText = data.check_in_time || "--:--";
@@ -533,6 +538,7 @@ export async function checkTodayAttendance() {
         updateHomeLiveStatus(false, true);
       }
     } else {
+      // DOKUMEN DIHAPUS OLEH GM/IT -> RESET OTOMATIS SECARA REAL-TIME
       if (checkinEl) checkinEl.innerText = "--:--";
       if (checkoutEl) checkoutEl.innerText = "--:--";
       if (btnAbsen) {
@@ -546,10 +552,11 @@ export async function checkTodayAttendance() {
       }
       updateHomeLiveStatus(false, false);
     }
-    loadAttendanceHistory();
-  } catch (e) { 
-    console.error("Error checkTodayAttendance:", e); 
-  }
+  }, (err) => {
+    console.warn("Realtime today attendance listener error:", err);
+  });
+
+  loadAttendanceHistory();
 }
 
 export function updateHomeLiveStatus(isPresent, isFinished) {
@@ -573,20 +580,24 @@ export function updateHomeLiveStatus(isPresent, isFinished) {
 }
 
 // ==========================================
-// 9. RIWAYAT PRESENSI PRIBADI
+// 9. REALTIME RIWAYAT PRESENSI PRIBADI
 // ==========================================
-export async function loadAttendanceHistory() {
+export function loadAttendanceHistory() {
   const user = auth.currentUser;
   const listEl = document.getElementById("attendance-history-list");
   if (!user || !listEl) return;
-  
-  try {
-    const q = query(collection(db, "attendance"), where("uid", "==", user.uid));
-    const snap = await getDocs(q);
+
+  if (unsubscribeAttendanceHistory) unsubscribeAttendanceHistory();
+
+  const q = query(collection(db, "attendance"), where("uid", "==", user.uid));
+
+  unsubscribeAttendanceHistory = onSnapshot(q, (snap) => {
     listEl.innerHTML = "";
     
     if (snap.empty) {
       listEl.innerHTML = "<p class='placeholder-text'>Belum ada riwayat.</p>";
+      const badgeEl = document.getElementById("attendance-count-badge");
+      if (badgeEl) badgeEl.innerText = `0 Hari Terakhir`;
       return;
     }
 
@@ -612,9 +623,9 @@ export async function loadAttendanceHistory() {
       `;
       listEl.appendChild(div);
     });
-  } catch (e) {
+  }, (err) => {
     listEl.innerHTML = "<p class='placeholder-text' style='color:#ef4444;'>Gagal memuat riwayat.</p>";
-  }
+  });
 }
 
 // ==========================================
@@ -995,7 +1006,6 @@ export async function saveEditedAttendance(e) {
     closeEditAttendanceModal();
     notify("Sukses", "Data absensi diperbarui & KPI disinkronkan.");
     generateAdminAttendanceReport();
-    if (auth.currentUser?.uid === uid) await checkTodayAttendance();
   } catch (err) {
     hideLoading();
     notify("Gagal Simpan", err.message);
@@ -1003,18 +1013,17 @@ export async function saveEditedAttendance(e) {
 }
 
 export async function deleteAttendanceRecord(docId, uid) {
-  const isConfirmed = await showCustomConfirm("Hapus Absensi", "Hapus data absensi ini secara permanen?");
+  const isConfirmed = await showCustomConfirm("Hapus Absensi", "Hapus data absensi ini secara permanen? KPI bulanan karyawan akan langsung dikalkulasi ulang.");
   if (!isConfirmed) return;
 
-  showLoading("Menghapus data...");
+  showLoading("Menghapus data absensi...");
   try {
     await deleteDoc(doc(db, "attendance", docId));
     if (uid && window.calculateUserKPI) await window.calculateUserKPI(uid);
 
     hideLoading();
-    notify("Sukses", "Data absensi dihapus.");
+    notify("Sukses", "Data absensi dihapus & KPI diperbarui.");
     generateAdminAttendanceReport();
-    if (auth.currentUser?.uid === uid) await checkTodayAttendance();
   } catch (e) {
     hideLoading();
     notify("Gagal", e.message);
@@ -1076,7 +1085,6 @@ export async function submitLeaveRequest(startDate, endDate, duration, reason) {
     hideLoading();
     notify("Berhasil", `Pengajuan ${state.pendingLeaveType} berhasil dikirim.`);
     navigateToTab('absensi');
-    checkTodayAttendance();
   } catch (err) {
     hideLoading();
     notify("Gagal", err.message);
