@@ -13,9 +13,14 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="./icon-192.png">
 
-  <!-- GOOGLE FONTS & STYLESHEET -->
+  <!-- PRECONNECT MAP TILES CDN & GOOGLE FONTS -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://a.basemaps.cartocdn.com" crossorigin>
+  <link rel="preconnect" href="https://b.basemaps.cartocdn.com" crossorigin>
+  <link rel="preconnect" href="https://c.basemaps.cartocdn.com" crossorigin>
+
+  <!-- STYLESHEET INTERNAL -->
   <link rel="stylesheet" href="./style.css">
   
   <!-- MAPLIBRE GL JS (PRESENSI GPS) -->
@@ -33,12 +38,9 @@
 </head>
 <body>
 
-  <!-- GLOBAL LOADER -->
-  <div id="global-loader" class="modal-overlay hidden">
-    <div class="modal-card modal-loader-box">
-      <div class="ios-spinner"></div>
-      <p id="loader-text" class="mt-2 font-700">Memproses sistem...</p>
-    </div>
+  <!-- GLOBAL LOADER MINIMALIS (FLOATING SPINNER MELAYANG TANPA KOTAK & TEKS) -->
+  <div id="global-loader" class="hidden">
+    <div class="loading-spinner"></div>
   </div>
 
   <!-- HEADER ATAS -->
