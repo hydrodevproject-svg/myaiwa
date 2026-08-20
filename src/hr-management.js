@@ -1,5 +1,6 @@
 /* ==========================================================================
-   MYAIWA - HR MANAGEMENT, CAREER PATH, ROLES & DELEGATION (LENGKAP & OPTIMAL)
+   MYAIWA - HR MANAGEMENT, CAREER PATH, ROLES & DELEGATION (LENGKAP)
+   MYAIWA - AIWA RAGIN JAJE SYSTEM
    ========================================================================== */
 
 import { db } from "../firebase-config.js";
@@ -32,10 +33,8 @@ import {
   filterLeaderboardReport 
 } from "./tasks-kpi.js";
 
-// Re-ekspor fungsi leaderboard agar tetap sinkron di window global
 export { renderGMLeaderboardReport, filterLeaderboardReport };
 
-// State temporary roster outlet aktif
 let activeStaffRoster = { ...DEFAULT_STAFF_WEEKLY_ROSTER };
 
 // ==========================================
@@ -485,97 +484,7 @@ export function selectEmployeeFromPicker(userId, userName, userObj) {
 }
 
 // ==========================================
-// 5. TERBITKAN & KUNCI SLIP GAJI MASSAL
-// ==========================================
-export async function lockAndPublishMonthlySlips() {
-  const monthPicker = document.getElementById("publish-month-picker");
-  const targetPeriod = monthPicker?.value || new Date().toISOString().slice(0, 7);
-
-  showLoading(`Menerbitkan & mengunci slip gaji periode ${targetPeriod}...`);
-  try {
-    if (!state.allEmployeesCache || state.allEmployeesCache.length === 0) {
-      await loadHRUserOptions();
-    }
-
-    const publishPromises = state.allEmployeesCache.map(async (u) => {
-      const salSnap = await getDoc(doc(db, "salary_structures", u.id));
-      const salData = salSnap.exists() ? salSnap.data() : { base_salary: 2000000, meal_allowance_daily: 15000 };
-
-      const attSnap = await getDocs(query(
-        collection(db, "attendance"),
-        where("date", ">=", `${targetPeriod}-01`),
-        where("date", "<=", `${targetPeriod}-31`)
-      ));
-
-      let hadirCount = 0;
-      attSnap.forEach(d => {
-        const att = d.data();
-        if (att.uid === u.id && att.status === "Hadir") hadirCount++;
-      });
-
-      const allowance = Number(u.custom_allowance || 0);
-      const mealTotal = hadirCount * Number(salData.meal_allowance_daily || 15000);
-      const totalEarnings = Number(salData.base_salary || 0) + allowance + mealTotal;
-      const thp = totalEarnings;
-
-      const slipUniqueId = `${u.id}_${targetPeriod}`;
-      return setDoc(doc(db, "salary_slips_archive", slipUniqueId), {
-        uid: u.id,
-        nama: u.nama || u.email,
-        role: u.role || "staff",
-        period: targetPeriod,
-        base_salary: salData.base_salary || 0,
-        position_allowance: allowance,
-        meal_allowance: mealTotal,
-        total_earnings: totalEarnings,
-        total_deductions: 0,
-        thp: thp,
-        bank_name: salData.bank_name || "BCA",
-        bank_number: salData.bank_number || "-",
-        bank_holder: salData.bank_holder || (u.nama || u.email),
-        published_at: serverTimestamp()
-      }, { merge: true });
-    });
-
-    await Promise.all(publishPromises);
-    hideLoading();
-    notify("Sukses", `Slip gaji seluruh staf untuk periode ${targetPeriod} berhasil diterbitkan dan dikunci.`);
-  } catch (e) {
-    hideLoading();
-    notify("Gagal Terbit", e.message);
-  }
-}
-
-// ==========================================
-// 6. PENUGASAN TUGAS KHUSUS STAF
-// ==========================================
-export async function assignCustomTask(userId, instruction, targetDate) {
-  if (!userId) return notify("Perhatian", "Pilih karyawan terlebih dahulu.");
-  if (!instruction) return notify("Perhatian", "Tuliskan instruksi tugas.");
-  if (!targetDate) return notify("Perhatian", "Tentukan tanggal berlaku tugas.");
-
-  showLoading("Mengirimkan tugas khusus...");
-  try {
-    const taskId = `task_${userId}_${Date.now()}`;
-    await setDoc(doc(db, "staff_tasks", taskId), {
-      uid: userId,
-      instruction: instruction,
-      target_date: targetDate,
-      completed: false,
-      created_at: serverTimestamp()
-    });
-
-    hideLoading();
-    notify("Sukses", "Tugas khusus berhasil dikirimkan ke akun karyawan.");
-    document.getElementById("task-instruction-input").value = "";
-  } catch (e) {
-    hideLoading();
-    notify("Gagal", e.message);
-  }
-}
-
-// ==========================================
-// 7. PARAMETER ROLE TOKO (KUSTOMISASI GM)
+// 5. PARAMETER ROLE TOKO (KUSTOMISASI GM)
 // ==========================================
 export function openRoleParameterPage(roleKey, roleTitle, pushState = true) {
   if (pushState) {
@@ -595,15 +504,24 @@ export function openRoleParameterPage(roleKey, roleTitle, pushState = true) {
   if (hiddenInput) hiddenInput.value = roleKey;
 
   const cfg = state.roleParamsCache[roleKey] || DEFAULT_ROLE_PARAMS[roleKey] || DEFAULT_ROLE_PARAMS.staff;
-  document.getElementById("cfg-role-pagi-start").value = cfg.pagi_start || "07:30";
-  document.getElementById("cfg-role-pagi-end").value = cfg.pagi_end || "15:30";
-  document.getElementById("cfg-role-malam-start").value = cfg.malam_start || "13:30";
-  document.getElementById("cfg-role-malam-end").value = cfg.malam_end || "21:00";
-  document.getElementById("cfg-role-it-threshold").value = cfg.it_threshold || "10:00";
-  document.getElementById("cfg-role-tolerance").value = cfg.tolerance || 15;
-  document.getElementById("cfg-role-overtime-rate").value = cfg.overtime_rate || 25000;
-  document.getElementById("cfg-role-late-penalty").value = cfg.late_penalty || 10000;
-  document.getElementById("cfg-role-radius-meter").value = cfg.radius_meter || 100;
+  
+  const pagiStart = document.getElementById("cfg-role-pagi-start");
+  const pagiEnd = document.getElementById("cfg-role-pagi-end");
+  const malamStart = document.getElementById("cfg-role-malam-start");
+  const malamEnd = document.getElementById("cfg-role-malam-end");
+  const tolerance = document.getElementById("cfg-role-tolerance");
+  const overtimeRate = document.getElementById("cfg-role-overtime-rate");
+  const latePenalty = document.getElementById("cfg-role-late-penalty");
+  const radiusMeter = document.getElementById("cfg-role-radius-meter");
+
+  if (pagiStart) pagiStart.value = cfg.pagi_start || "07:30";
+  if (pagiEnd) pagiEnd.value = cfg.pagi_end || "15:30";
+  if (malamStart) malamStart.value = cfg.malam_start || "13:30";
+  if (malamEnd) malamEnd.value = cfg.malam_end || "21:00";
+  if (tolerance) tolerance.value = cfg.tolerance !== undefined ? cfg.tolerance : 15;
+  if (overtimeRate) overtimeRate.value = cfg.overtime_rate !== undefined ? cfg.overtime_rate : 25000;
+  if (latePenalty) latePenalty.value = cfg.late_penalty !== undefined ? cfg.late_penalty : 10000;
+  if (radiusMeter) radiusMeter.value = cfg.radius_meter !== undefined ? cfg.radius_meter : 100;
 }
 
 export async function saveRoleParameters(roleKey, payload) {
