@@ -134,7 +134,7 @@
           <span class="badge-completed">HR SYSTEM</span>
         </div>
 
-        <form id="form-assign-shift" class="mt-2">
+        <form id="form-assign-shift" class="mt-2" onsubmit="saveAssignedShift(event)">
           <div class="form-group mb-2">
             <label>PILIH KARYAWAN TARGET</label>
             <input type="hidden" id="hr-select-user" required>
@@ -204,7 +204,7 @@
                 <strong style="width:75px; font-size:0.75rem;">KAMIS</strong>
                 <div class="grid-3 gap-sm" style="display:grid; grid-template-columns:repeat(3, 1fr); flex:1;">
                   <button type="button" class="btn-roster-pill active-shift" id="rost-kamis-pagi" onclick="setRosterDay('kamis', 'pagi')">Pagi</button>
-                  <button type="button" class="btn-roster-pill" id="rost-kamis-malam" onclick="setRosterDay('kamis', 'malam')">Malam</button>
+                  <button type="button" class="btn-roster-pill active-shift" id="rost-kamis-malam" onclick="setRosterDay('kamis', 'malam')">Malam</button>
                   <button type="button" class="btn-roster-pill" id="rost-kamis-libur" onclick="setRosterDay('kamis', 'libur')">Libur</button>
                 </div>
               </div>
@@ -213,7 +213,7 @@
                 <strong style="width:75px; font-size:0.75rem;">JUMAT</strong>
                 <div class="grid-3 gap-sm" style="display:grid; grid-template-columns:repeat(3, 1fr); flex:1;">
                   <button type="button" class="btn-roster-pill active-shift" id="rost-jumat-pagi" onclick="setRosterDay('jumat', 'pagi')">Pagi</button>
-                  <button type="button" class="btn-roster-pill" id="rost-jumat-malam" onclick="setRosterDay('jumat', 'malam')">Malam</button>
+                  <button type="button" class="btn-roster-pill active-shift" id="rost-jumat-malam" onclick="setRosterDay('jumat', 'malam')">Malam</button>
                   <button type="button" class="btn-roster-pill" id="rost-jumat-libur" onclick="setRosterDay('jumat', 'libur')">Libur</button>
                 </div>
               </div>
@@ -222,7 +222,7 @@
                 <strong style="width:75px; font-size:0.75rem;">SABTU</strong>
                 <div class="grid-3 gap-sm" style="display:grid; grid-template-columns:repeat(3, 1fr); flex:1;">
                   <button type="button" class="btn-roster-pill active-shift" id="rost-sabtu-pagi" onclick="setRosterDay('sabtu', 'pagi')">Pagi</button>
-                  <button type="button" class="btn-roster-pill" id="rost-sabtu-malam" onclick="setRosterDay('sabtu', 'malam')">Malam</button>
+                  <button type="button" class="btn-roster-pill active-shift" id="rost-sabtu-malam" onclick="setRosterDay('sabtu', 'malam')">Malam</button>
                   <button type="button" class="btn-roster-pill" id="rost-sabtu-libur" onclick="setRosterDay('sabtu', 'libur')">Libur</button>
                 </div>
               </div>
@@ -615,7 +615,7 @@
       </div>
     </div>
 
-    <!-- SUBTAB 8: FORM PARAMETER ROLE (TANPA KOLOM SHIFT IT/FLEKSIBEL) -->
+    <!-- SUBTAB 8: FORM PARAMETER ROLE (DENGAN ONSUBMIT HANDLER) -->
     <div id="subtab-hr-role-param-form" class="sub-tab-content hr-feature-page hidden">
       <div class="card">
         <div class="sheet-section-title mb-2">
@@ -623,7 +623,7 @@
           <span class="badge-status-work" id="role-param-badge">CONFIG</span>
         </div>
 
-        <form id="form-update-role-param" class="mt-2">
+        <form id="form-update-role-param" class="mt-2" onsubmit="handleSaveRoleParameters(event)">
           <input type="hidden" id="target-role-param-id" value="staff">
 
           <div class="grid-2 gap-sm mb-2">
