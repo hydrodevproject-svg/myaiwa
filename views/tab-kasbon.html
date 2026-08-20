@@ -1,0 +1,90 @@
+<div id="tab-kasbon" class="tab-content hidden">
+  <div class="card mb-2">
+    <div class="sheet-section-title mb-1">
+      <span class="text-uppercase-label font-700">SALDO PINJAMAN KASBON</span>
+      <span id="kasbon-status-badge" class="badge-status-work">AKTIF</span>
+    </div>
+    
+    <div class="mt-1 mb-1">
+      <small class="instruction-note">SISA KASBON SAAT INI</small>
+      <strong id="display-sisa-kasbon" class="hero-user-name text-accent">Rp 0</strong>
+    </div>
+
+    <div class="grid-2 gap-sm mt-2">
+      <div class="time-stat-pill text-left">
+        <small>Total Pernah Diajukan</small>
+        <strong id="display-total-pinjaman">Rp 0</strong>
+      </div>
+      <div class="time-stat-pill text-left">
+        <small>Sudah Dilunasi / Dipotong</small>
+        <strong id="display-total-pelunasan" class="text-db-status">Rp 0</strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2 gap-sm mb-2">
+    <button type="button" class="btn-primary" onclick="openKasbonForm('pinjam')">
+      <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+      <span>Ajukan Kasbon</span>
+    </button>
+    <button type="button" class="btn-secondary-line" onclick="openKasbonForm('bayar')">
+      <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+      <span>Bayar / Setor Kasbon</span>
+    </button>
+  </div>
+
+  <div id="box-form-kasbon" class="card mb-2 hidden">
+    <div class="sheet-section-title mb-2">
+      <span class="text-uppercase-label" id="kasbon-form-title">Formulir Pengajuan Pinjaman Kasbon</span>
+    </div>
+    <form id="form-transaksi-kasbon">
+      <input type="hidden" id="kasbon-action-type" value="pinjam">
+      
+      <div class="form-group">
+        <label id="kasbon-input-label">TOTAL NOMINAL PINJAMAN (RP)</label>
+        <input type="number" id="kasbon-amount-input" required placeholder="Contoh: 1500000" min="50000">
+      </div>
+
+      <div id="box-cicilan-fields" class="grid-2 gap-sm">
+        <div class="form-group">
+          <label>RENCANA CICILAN / BULAN (RP)</label>
+          <input type="number" id="kasbon-monthly-installment" placeholder="Contoh: 500000" min="50000">
+        </div>
+        <div class="form-group">
+          <label>JANGKA WAKTU (TENOR)</label>
+          <select id="kasbon-tenor-months">
+            <option value="1">1 Bulan (Lunas Sekali)</option>
+            <option value="2">2 Bulan</option>
+            <option value="3">3 Bulan</option>
+            <option value="4">4 Bulan</option>
+            <option value="6">6 Bulan</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group mt-1">
+        <label>KETERANGAN KEPERLUAN</label>
+        <textarea id="kasbon-notes-input" class="custom-textarea" rows="2" required placeholder="Tuliskan alasan pengajuan pinjaman..."></textarea>
+      </div>
+
+      <div class="grid-2 gap-sm mt-2">
+        <button type="submit" class="btn-primary">Kirim Transaksi</button>
+        <button type="button" class="btn-secondary-line" onclick="document.getElementById('box-form-kasbon').classList.add('hidden')">Batal</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="sheet-section-title mb-2">
+      <span class="text-uppercase-label">Riwayat & Mutasi Kasbon Akun</span>
+    </div>
+    <div id="kasbon-history-list" class="product-scroll-list max-h-280">
+      <p class="placeholder-text">Memuat riwayat kasbon...</p>
+    </div>
+  </div>
+</div>

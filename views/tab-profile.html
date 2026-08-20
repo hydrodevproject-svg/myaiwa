@@ -1,0 +1,84 @@
+<div id="tab-profile" class="tab-content hidden">
+  <div class="card mb-2">
+    <div class="profile-header-center">
+      <div class="profile-avatar-wrapper">
+        <img id="page-user-avatar" alt="" class="avatar-profile-main image-fade">
+      </div>
+      <strong id="page-user-name" class="profile-name-title mt-1">Nama Pengguna</strong>
+      <small id="page-user-email" class="profile-email-sub">email@aiwaraginjaje.com</small>
+    </div>
+  </div>
+
+  <div class="card mb-2">
+    <div class="sheet-section-title mb-2">
+      <span class="text-uppercase-label">Tampilan & Tema</span>
+    </div>
+    <div class="grid-2 gap-sm">
+      <button type="button" id="profile-theme-light" class="btn-theme-segmented active-theme" onclick="switchGlobalTheme('light')">
+        <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        <span>Terang</span>
+      </button>
+      <button type="button" id="profile-theme-dark" class="btn-theme-segmented" onclick="switchGlobalTheme('dark')">
+        <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+        <span>Gelap</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="card mb-2">
+    <div class="sheet-section-title mb-2">
+      <span class="text-uppercase-label">Foto Profil Akun</span>
+    </div>
+    <div class="avatar-upload-row">
+      <div class="avatar-preview-small-wrap">
+        <img id="preview-user-avatar" alt="" class="avatar-preview-small image-fade">
+      </div>
+      <div class="avatar-upload-control">
+        <div class="custom-file-upload">
+          <input type="file" id="input-avatar-file" class="file-input-hidden" accept="image/*" onchange="updateFileName(this, 'avatar-file-label')">
+          <label for="input-avatar-file" class="file-upload-card-btn">
+            <div class="file-btn-action-pill">
+              <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              <span>Pilih Foto</span>
+            </div>
+            <span id="avatar-file-label" class="file-status-text">Belum ada file dipilih</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-2">
+    <div class="sheet-section-title mb-2">
+      <span class="text-uppercase-label">Kelengkapan Data Diri</span>
+      <small class="text-danger">* WAJIB DIISI</small>
+    </div>
+
+    <form id="form-update-profile">
+      <div class="form-group">
+        <label>NAMA LENGKAP</label>
+        <input type="text" id="profile-full-name" required placeholder="Nama Lengkap">
+      </div>
+      <div class="form-group">
+        <label>NOMOR WHATSAPP / HP</label>
+        <input type="tel" id="profile-phone" required placeholder="0823XXXXXXXX">
+      </div>
+      <div class="form-group">
+        <label>ALAMAT DOMISILI</label>
+        <input type="text" id="profile-address" required placeholder="Alamat lengkap">
+      </div>
+
+      <button type="button" class="btn-change-password mt-2" onclick="navigateToTab('change-pass')">
+        <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        <span>Ubah Password Akun</span>
+      </button>
+
+      <button type="submit" class="btn-primary mt-2 btn-full">Simpan Semua Pengaturan</button>
+    </form>
+
+    <button type="button" class="btn-logout-full mt-2" onclick="triggerLogout()">
+      <svg class="icon-inline text-danger" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+      <span>Keluar Akun</span>
+    </button>
+  </div>
+</div>
