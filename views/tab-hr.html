@@ -203,8 +203,8 @@
               <div class="roster-day-row picker-user-row" style="padding:8px 12px;">
                 <strong style="width:75px; font-size:0.75rem;">KAMIS</strong>
                 <div class="grid-3 gap-sm" style="display:grid; grid-template-columns:repeat(3, 1fr); flex:1;">
-                  <button type="button" class="btn-roster-pill" id="rost-kamis-pagi" onclick="setRosterDay('kamis', 'pagi')">Pagi</button>
-                  <button type="button" class="btn-roster-pill active-shift" id="rost-kamis-malam" onclick="setRosterDay('kamis', 'malam')">Malam</button>
+                  <button type="button" class="btn-roster-pill active-shift" id="rost-kamis-pagi" onclick="setRosterDay('kamis', 'pagi')">Pagi</button>
+                  <button type="button" class="btn-roster-pill" id="rost-kamis-malam" onclick="setRosterDay('kamis', 'malam')">Malam</button>
                   <button type="button" class="btn-roster-pill" id="rost-kamis-libur" onclick="setRosterDay('kamis', 'libur')">Libur</button>
                 </div>
               </div>
@@ -212,8 +212,8 @@
               <div class="roster-day-row picker-user-row" style="padding:8px 12px;">
                 <strong style="width:75px; font-size:0.75rem;">JUMAT</strong>
                 <div class="grid-3 gap-sm" style="display:grid; grid-template-columns:repeat(3, 1fr); flex:1;">
-                  <button type="button" class="btn-roster-pill" id="rost-jumat-pagi" onclick="setRosterDay('jumat', 'pagi')">Pagi</button>
-                  <button type="button" class="btn-roster-pill active-shift" id="rost-jumat-malam" onclick="setRosterDay('jumat', 'malam')">Malam</button>
+                  <button type="button" class="btn-roster-pill active-shift" id="rost-jumat-pagi" onclick="setRosterDay('jumat', 'pagi')">Pagi</button>
+                  <button type="button" class="btn-roster-pill" id="rost-jumat-malam" onclick="setRosterDay('jumat', 'malam')">Malam</button>
                   <button type="button" class="btn-roster-pill" id="rost-jumat-libur" onclick="setRosterDay('jumat', 'libur')">Libur</button>
                 </div>
               </div>
@@ -221,8 +221,8 @@
               <div class="roster-day-row picker-user-row" style="padding:8px 12px;">
                 <strong style="width:75px; font-size:0.75rem;">SABTU</strong>
                 <div class="grid-3 gap-sm" style="display:grid; grid-template-columns:repeat(3, 1fr); flex:1;">
-                  <button type="button" class="btn-roster-pill" id="rost-sabtu-pagi" onclick="setRosterDay('sabtu', 'pagi')">Pagi</button>
-                  <button type="button" class="btn-roster-pill active-shift" id="rost-sabtu-malam" onclick="setRosterDay('sabtu', 'malam')">Malam</button>
+                  <button type="button" class="btn-roster-pill active-shift" id="rost-sabtu-pagi" onclick="setRosterDay('sabtu', 'pagi')">Pagi</button>
+                  <button type="button" class="btn-roster-pill" id="rost-sabtu-malam" onclick="setRosterDay('sabtu', 'malam')">Malam</button>
                   <button type="button" class="btn-roster-pill" id="rost-sabtu-libur" onclick="setRosterDay('sabtu', 'libur')">Libur</button>
                 </div>
               </div>
@@ -300,7 +300,7 @@
             </div>
             <div class="time-stat-pill text-left mt-1">
               <strong>Shift IT Fleksibel (Hybrid)</strong>
-              <small class="instruction-note mt-1">Staf IT secara otomatis berhak membagi mode kerja (Maks 40% WFA & Min 60% WFO per bulan). Batas check-in jam 10:00 WITA.</small>
+              <small class="instruction-note mt-1">Staf IT secara otomatis berhak membagi mode kerja (Maks 40% WFA & Min 60% WFO per bulan).</small>
             </div>
           </div>
 
@@ -601,7 +601,7 @@
               <svg class="icon-inline" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
             </div>
             <strong>Staff It</strong>
-            <small>Batas Masuk IT</small>
+            <small>Jam & Radius IT</small>
           </div>
 
           <div class="hr-icon-card" onclick="openRoleParameterPage('gm', 'General Manager')">
@@ -615,7 +615,7 @@
       </div>
     </div>
 
-    <!-- SUBTAB 8: FORM PARAMETER ROLE (LENGKAP & KUSTOM) -->
+    <!-- SUBTAB 8: FORM PARAMETER ROLE (TANPA KOLOM SHIFT IT/FLEKSIBEL) -->
     <div id="subtab-hr-role-param-form" class="sub-tab-content hr-feature-page hidden">
       <div class="card">
         <div class="sheet-section-title mb-2">
@@ -646,11 +646,6 @@
               <label>JAM PULANG MALAM</label>
               <input type="time" id="cfg-role-malam-end" value="21:00" required>
             </div>
-          </div>
-
-          <div class="form-group mb-2">
-            <label>BATAS JAM MASUK SHIFT IT / FLEKSIBEL</label>
-            <input type="time" id="cfg-role-it-threshold" value="10:00" required>
           </div>
 
           <div class="grid-2 gap-sm mb-2">
