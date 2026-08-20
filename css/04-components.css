@@ -1202,3 +1202,68 @@ body.dark-mode .rank-medal-3 {
 .btn-att-delete:active {
   background: rgba(239, 68, 68, 0.16) !important;
 }
+
+/* ==========================================================================
+   LOADING OVERLAY MINIMALIS (FLOATING SPINNER MELAYANG TANPA KOTAK & TEKS)
+   ========================================================================== */
+#loading-overlay,
+#global-loader {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999999;
+  pointer-events: all;
+}
+
+body.dark-mode #loading-overlay,
+body.dark-mode #global-loader {
+  background: rgba(15, 23, 42, 0.45);
+}
+
+#loading-overlay.hidden,
+#global-loader.hidden {
+  display: none !important;
+}
+
+#loading-overlay .loading-card,
+#global-loader .loader-card,
+#loading-card {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 0 !important;
+}
+
+#loading-text,
+#loader-text {
+  display: none !important;
+}
+
+.loading-spinner,
+.spinner {
+  width: 44px;
+  height: 44px;
+  border: 3.5px solid rgba(26, 75, 139, 0.15);
+  border-top-color: var(--text-accent, #1a4b8b);
+  border-radius: 50%;
+  animation: spinFloating 0.65s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+body.dark-mode .loading-spinner,
+body.dark-mode .spinner {
+  border: 3.5px solid rgba(59, 130, 246, 0.2);
+  border-top-color: #3b82f6;
+}
+
+@keyframes spinFloating {
+  to {
+    transform: rotate(360deg);
+  }
+}
