@@ -1,0 +1,268 @@
+<div id="tab-it" class="tab-content hidden">
+  <div id="it-menu-grid-view">
+    <div class="card mb-2">
+      <div class="sheet-section-title mb-2">
+        <span class="text-uppercase-label">Modul Super Admin IT</span>
+      </div>
+      <div class="hr-icons-grid">
+        <div class="hr-icon-card" onclick="openITSubPage('it-database')">
+          <div class="hr-icon-bubble bg-telegram-subtle">
+            <svg class="icon-inline" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+          </div>
+          <strong>Kapasitas DB</strong>
+          <small>Metrik & Storage</small>
+        </div>
+
+        <div class="hr-icon-card" onclick="openITSubPage('it-users')">
+          <div class="hr-icon-bubble bg-soft-mint">
+            <svg class="icon-inline" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+          </div>
+          <strong>Pengguna</strong>
+          <small>Kelola Akun</small>
+        </div>
+
+        <div class="hr-icon-card" onclick="openITSubPage('it-register')">
+          <div class="hr-icon-bubble bg-tiktok-pink">
+            <svg class="icon-inline" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+          </div>
+          <strong>Registrasi</strong>
+          <small>Tambah Akun</small>
+        </div>
+
+        <div class="hr-icon-card" onclick="openITSubPage('it-logs')">
+          <div class="hr-icon-bubble bg-soft-purple">
+            <svg class="icon-inline" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+          </div>
+          <strong>Audit Log</strong>
+          <small>Riwayat Sistem</small>
+        </div>
+
+        <div class="hr-icon-card" onclick="openITSubPage('it-backup')">
+          <div class="hr-icon-bubble bg-soft-amber">
+            <svg class="icon-inline" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+          </div>
+          <strong>Backup & Bersih</strong>
+          <small>Unduh & Hapus DB</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="it-subpage-detail-view" class="hidden">
+    <div id="subtab-it-database" class="sub-tab-content it-feature-page hidden">
+      <div class="card mb-2">
+        <div class="it-section-header">
+          <div class="it-header-title">
+            <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            <span>METRIK SISTEM & KESEHATAN SERVER</span>
+          </div>
+          <button type="button" class="it-text-btn" onclick="refreshITMetrics()">Refresh Data</button>
+        </div>
+
+        <div class="grid-2 gap-sm mt-2">
+          <div class="db-stat-badge-chip">
+            <small>STATUS DATABASE</small>
+            <strong class="text-success-status">ONLINE (AKTIF)</strong>
+          </div>
+          <div class="db-stat-badge-chip text-right">
+            <small>BATAS KUOTA</small>
+            <strong>1.024 MB (1 GB)</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-2">
+        <div class="sheet-section-title mb-2">
+          <span class="text-uppercase-label">Penggunaan Penyimpanan Storage</span>
+          <strong id="it-storage-pct" class="db-bar-score">0.0%</strong>
+        </div>
+
+        <div class="db-diagram-track-container">
+          <div id="it-storage-fill" class="db-diagram-bar-fill fill-gradient-cyan"></div>
+        </div>
+
+        <div class="db-diagram-scale-row mt-1">
+          <span id="it-storage-text">0.00 KB Digunakan</span>
+          <span>Maks 1 GB</span>
+        </div>
+      </div>
+
+      <div class="card mb-2">
+        <div class="sheet-section-title mb-2">
+          <span class="text-uppercase-label">Beban Dokumen Terdaftar</span>
+          <strong id="it-doc-pct" class="db-bar-score">0%</strong>
+        </div>
+
+        <div class="db-diagram-track-container">
+          <div id="it-doc-fill" class="db-diagram-bar-fill fill-gradient-purple"></div>
+        </div>
+
+        <div class="db-diagram-scale-row mt-1">
+          <span id="it-doc-text">0 Dokumen Aktif</span>
+          <span>Kapasitas Optimal: 5.000 Dok</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="subtab-it-users" class="sub-tab-content it-feature-page hidden">
+      <div class="card">
+        <div class="sheet-section-title mb-2">
+          <span class="text-uppercase-label">MANAJEMEN PENGGUNA SYSTEM</span>
+          <span class="badge-completed">IT SYSTEM</span>
+        </div>
+        <div class="form-group mb-2">
+          <input type="text" id="it-search-users" placeholder="Cari email / role..." onkeyup="filterITUsersList()">
+        </div>
+        <div class="it-table-container mt-2">
+          <table class="it-table">
+            <thead>
+              <tr>
+                <th>EMAIL</th>
+                <th>ROLE</th>
+                <th class="text-right">AKSI</th>
+              </tr>
+            </thead>
+            <tbody id="it-users-tbody">
+              <tr><td colspan="3" class="placeholder-text">Memuat pengguna...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="subtab-it-register" class="sub-tab-content it-feature-page hidden">
+      <div class="card">
+        <div class="sheet-section-title mb-2">
+          <span class="text-uppercase-label">REGISTRASI AKUN BARU</span>
+          <span class="badge-completed">SECURITY</span>
+        </div>
+        <form id="form-it-create-user" class="mt-2">
+          <div class="form-group">
+            <label>Nama Lengkap Karyawan</label>
+            <input type="text" id="it-user-name" required placeholder="Contoh: Admin IT">
+          </div>
+          <div class="form-group">
+            <label>Email Karyawan</label>
+            <input type="email" id="it-user-email" required placeholder="email@aiwaraginjaje.com">
+          </div>
+          <div class="form-group">
+            <label>Password Sementara</label>
+            <input type="password" id="it-user-password" required placeholder="Minimal 6 karakter">
+          </div>
+          <div class="form-group">
+            <label>Hak Akses (Role)</label>
+            <select id="it-user-role" required>
+              <option value="" disabled selected>-- Pilih Role Staf --</option>
+              <option value="staff">Staff Outlet</option>
+              <option value="admin">Staff Admin</option>
+              <option value="logistik">Staff Logistik</option>
+              <option value="it">Staff It</option>
+              <option value="gm">gm</option>
+            </select>
+          </div>
+          <button type="submit" class="btn-primary btn-full mt-2">Daftarkan Akun Karyawan</button>
+        </form>
+      </div>
+    </div>
+
+    <div id="subtab-it-logs" class="sub-tab-content it-feature-page hidden">
+      <div class="card">
+        <div class="sheet-section-title mb-2">
+          <span class="text-uppercase-label">LOG AKTIVITAS SISTEM</span>
+          <span class="badge-completed">AUDIT</span>
+        </div>
+        <div class="grid-2 gap-sm mt-2">
+          <div class="form-group mb-0">
+            <input type="text" id="log-search-input" placeholder="Cari aktivitas..." onkeyup="filterAuditLogs()">
+          </div>
+          <div class="form-group mb-0">
+            <input type="date" id="log-date-filter" class="custom-date-input" onchange="filterAuditLogs()">
+          </div>
+        </div>
+        <div id="it-logs-container" class="product-scroll-list max-h-280 mt-2">
+          <p class="placeholder-text">Memuat audit trail...</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="subtab-it-backup" class="sub-tab-content it-feature-page hidden">
+      <div class="card mb-2">
+        <div class="sheet-section-title mb-2">
+          <span class="text-uppercase-label">BACKUP DATA MASSAL (EXPORT)</span>
+          <span class="badge-completed">BACKUP ENGINE</span>
+        </div>
+        <p class="instruction-note mb-2">Unduh seluruh isi database sebelum melakukan pembersihan data transaksi.</p>
+        
+        <div class="form-group">
+          <label>PILIH KOLEKSI TARGET</label>
+          <select id="export-target-col">
+            <option value="all">Semua Koleksi (Full Database .JSON)</option>
+            <option value="attendance">Absensi & Log Kehadiran (.JSON / .XLSX)</option>
+            <option value="users">Daftar Pengguna & Karyawan (.JSON / .XLSX)</option>
+            <option value="salary_slips_archive">Arsip Slip Gaji Digital (.JSON / .XLSX)</option>
+            <option value="employee_requests">Pengajuan Kasbon & Cuti (.JSON / .XLSX)</option>
+            <option value="salary_structures">Struktur Gaji (.JSON / .XLSX)</option>
+            <option value="staff_tasks">Penugasan Khusus Staf (.JSON / .XLSX)</option>
+            <option value="daily_task_logs">Checklist Tugas Harian (.JSON / .XLSX)</option>
+          </select>
+        </div>
+
+        <div class="grid-2 gap-sm mt-2">
+          <button type="button" class="btn-primary" onclick="exportDatabaseBackup('json')">
+            <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>Backup JSON</span>
+          </button>
+          <button type="button" class="btn-secondary-line" onclick="exportDatabaseBackup('xlsx')">
+            <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span>Export Excel</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="card mb-2">
+        <div class="sheet-section-title mb-2">
+          <span class="text-uppercase-label text-danger font-700">BERSIHKAN DATABASE MASSAL</span>
+          <span class="badge-status-work badge-kurang">DANGER ZONE</span>
+        </div>
+        <p class="instruction-note mb-2 text-danger">
+          * PERINGATAN: Aksi ini akan menghapus seluruh data Absensi, Pengajuan, Struktur Gaji, dan Arsip Slip Gaji. <strong>Data AKUN PENGGUNA (users) TIDAK AKAN DIHAPUS</strong>.
+        </p>
+        <button type="button" class="btn-logout-full" onclick="executeMassDatabaseWipe()">
+          <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          <span>Hapus Massal Semua Data (Kecuali Akun)</span>
+        </button>
+      </div>
+
+      <div class="card">
+        <div class="sheet-section-title mb-2">
+          <span class="text-uppercase-label">IMPORT DATA KE DATABASE (.XLSX / .JSON)</span>
+          <span class="badge-completed">RESTORE</span>
+        </div>
+        <form id="form-import-data" class="mt-2">
+          <div class="form-group">
+            <label>Target Koleksi Tujuan</label>
+            <select id="import-target-col" required>
+              <option value="attendance">Absensi (attendance)</option>
+              <option value="salary_structures">Struktur Gaji (salary_structures)</option>
+              <option value="users">Pengguna (users)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Pilih Berkas Cadangan</label>
+            <div class="custom-file-upload">
+              <input type="file" id="import-file-input" class="file-input-hidden" accept=".xlsx, .xls, .csv, .json" required onchange="updateFileName(this, 'import-file-label')">
+              <label for="import-file-input" class="file-upload-card-btn">
+                <div class="file-btn-action-pill">
+                  <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+                  <span>Pilih Berkas</span>
+                </div>
+                <span id="import-file-label" class="file-status-text">Belum ada file dipilih</span>
+              </label>
+            </div>
+          </div>
+          <button type="submit" id="btn-execute-import" class="btn-primary btn-full mt-3">Proses Import / Restore</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

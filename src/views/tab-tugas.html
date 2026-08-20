@@ -1,0 +1,26 @@
+<div id="tab-tugas" class="tab-content hidden">
+  <div class="card mb-2">
+    <div class="sheet-section-title mb-2">
+      <div class="hero-badges-wrap">
+        <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M9 11l3 3L22 4"></path>
+          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+        </svg>
+        <span class="text-uppercase-label font-700">Daftar Tugas & SOP Hari Ini</span>
+      </div>
+      <span id="task-progress-badge" class="badge-status-work">0/0 SELESAI</span>
+    </div>
+    <p class="instruction-note mb-2">Centang tugas operasional harian Anda. Progres pengerjaan otomatis terintegrasi ke skor KPI bulanan secara akumulatif.</p>
+
+    <div id="daily-task-container" class="daily-task-list mt-2">
+      <p class="placeholder-text">Memuat daftar tugas...</p>
+    </div>
+
+    <button type="button" id="btn-submit-daily-tasks" class="btn-primary btn-full mt-3" onclick="submitDailyTasksFinal()">
+      <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+      <span>Submit & Kunci Tugas Hari Ini</span>
+    </button>
+  </div>
+</div>

@@ -1,0 +1,16 @@
+/* ==========================================================================
+   STYLE.CSS - MAIN MODULAR AGGREGATOR
+   MYAIWA - AIWA RAGIN JAJE SYSTEM
+   ========================================================================== */
+
+/* 1. GOOGLE FONTS */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+/* 2. MODULAR STYLESHEETS */
+@import url('./css/01-variables.css');
+@import url('./css/02-base.css');
+@import url('./css/03-layout.css');
+@import url('./css/04-components.css');
+@import url('./css/05-forms.css');
+@import url('./css/06-modals.css');
+@import url('./css/07-print.css');
