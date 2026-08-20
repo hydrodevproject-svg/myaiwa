@@ -1,0 +1,62 @@
+<div id="tab-absensi" class="tab-content hidden">
+  <div class="card attendance-time-card">
+    <div class="attendance-time-header">
+      <div class="attendance-info-group">
+        <span class="badge-status-work" id="user-shift-mode-badge">SHIFT PAGI · MODE WFO</span>
+      </div>
+      <button type="button" class="btn-cek-gps" id="btn-refresh-gps-action" onclick="refreshMapLibreGPS()">
+        <div id="gps-spinner-monotone" class="ios-monotone-spinner hidden"></div>
+        <svg id="gps-icon-monotone" class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a8 8 0 00-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 00-8-8zm0 11a3 3 0 110-6 3 3 0 010 6z"/></svg>
+        <span id="gps-btn-text">CEK GPS</span>
+      </button>
+    </div>
+
+    <div id="maplibre-view" class="leaflet-map-box mt-2"></div>
+
+    <div class="ahsan-radius-box mt-2" id="gps-radius-status-box">
+      <div class="radius-icon">
+        <svg class="icon-inline" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a8 8 0 00-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 00-8-8zm0 11a3 3 0 110-6 3 3 0 010 6z"/></svg>
+      </div>
+      <div class="radius-text">
+        <strong>MENDETEKSI LOKASI GPS...</strong>
+        <span>Pastikan izin lokasi browser aktif.</span>
+      </div>
+    </div>
+
+    <div class="grid-2 gap-sm mt-3">
+      <div class="time-stat-pill">
+        <small>Jam Check-In</small>
+        <strong id="today-checkin-time">--:--</strong>
+      </div>
+      <div class="time-stat-pill">
+        <small>Jam Check-Out</small>
+        <strong id="today-checkout-time">--:--</strong>
+      </div>
+    </div>
+
+    <button id="btn-trigger-attendance" class="btn-primary btn-full mt-3 btn-absen-large" onclick="executeGPSAttendance()">
+      <span>Proses Presensi Sekarang</span>
+    </button>
+
+    <div class="grid-2 gap-sm mt-2">
+      <button type="button" class="btn-sakit-custom" onclick="openLeaveFormPage('Sakit')">
+        <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        <span>SAKIT</span>
+      </button>
+      <button type="button" class="btn-izin-custom" onclick="openLeaveFormPage('Izin')">
+        <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        <span>IZIN</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="card mt-2">
+    <div class="sheet-section-title mb-2">
+      <span class="text-uppercase-label">Riwayat Kehadiran Saya</span>
+      <small id="attendance-count-badge">0 Hari</small>
+    </div>
+    <div id="attendance-history-list" class="product-scroll-list max-h-280">
+      <p class="placeholder-text">Memuat riwayat kehadiran...</p>
+    </div>
+  </div>
+</div>

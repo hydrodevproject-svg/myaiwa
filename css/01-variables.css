@@ -1,0 +1,38 @@
+/* ==========================================================================
+   01-VARIABLES.CSS - DESIGN SYSTEM TOKENS (LIGHT & DARK MODE)
+   ========================================================================== */
+
+:root {
+  --header-logo-size: 1.05rem;
+  --header-subtitle-size: 0.45rem;
+  --bg-color: #f4f5f9;
+  --card-bg: #ffffff;
+  --card-solid: #ffffff;
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --text-accent: #1a4b8b;
+  --text-accent-hover: #153c70;
+  --border-color: rgba(17, 24, 39, 0.08);
+  --input-bg: #f8fafc;
+  --radius-lg: 18px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+  --bottom-nav-bg: rgba(255, 255, 255, 0.92);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --shadow-md: 0 4px 16px -2px rgba(26, 75, 139, 0.08), 0 2px 6px -1px rgba(0, 0, 0, 0.03);
+}
+
+body.dark-mode {
+  --bg-color: #0b0f17;
+  --card-bg: #141c28;
+  --card-solid: #1c2738;
+  --text-primary: #f9fafb;
+  --text-secondary: #9ca3af;
+  --text-accent: #3b82f6;
+  --text-accent-hover: #2563eb;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --input-bg: #0f1722;
+  --bottom-nav-bg: rgba(15, 23, 34, 0.92);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.5);
+}

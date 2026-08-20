@@ -34,7 +34,7 @@ export const db = initializeFirestore(app, {
   })
 });
 
-// INSTANS SEKUNDER (UNTUK MEMBUAT USER BARU TANPA MENGGANGGU SESI LOGIN GM)
+// INSTANS SEKUNDER (UNTUK PENDAFTARAN USER TANPA LOGOUT USER AKTIF)
 export const secondaryApp = getApps().some(a => a.name === "SecondaryAuthApp") 
   ? getApp("SecondaryAuthApp") 
   : initializeApp(firebaseConfig, "SecondaryAuthApp");
