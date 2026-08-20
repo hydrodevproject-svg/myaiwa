@@ -169,6 +169,7 @@ export async function saveAssignedShift(e) {
 
     hideLoading();
     notify("Berhasil", "Jadwal shift & mode kerja karyawan berhasil diperbarui.");
+    openHRSubPage('hr-shift');
   } catch (err) {
     hideLoading();
     notify("Gagal Simpan", err.message);
@@ -484,7 +485,7 @@ export function selectEmployeeFromPicker(userId, userName, userObj) {
 }
 
 // ==========================================
-// 5. PARAMETER ROLE TOKO (KUSTOMISASI GM)
+// 5. PARAMETER ROLE TOKO (DENGAN HANDLER KUSTOM)
 // ==========================================
 export function openRoleParameterPage(roleKey, roleTitle, pushState = true) {
   if (pushState) {
@@ -524,7 +525,31 @@ export function openRoleParameterPage(roleKey, roleTitle, pushState = true) {
   if (radiusMeter) radiusMeter.value = cfg.radius_meter !== undefined ? cfg.radius_meter : 100;
 }
 
-export async function saveRoleParameters(roleKey, payload) {
+export async function handleSaveRoleParameters(e) {
+  if (e) e.preventDefault();
+
+  const roleKey = document.getElementById("target-role-param-id")?.value || "staff";
+  const pagiStart = document.getElementById("cfg-role-pagi-start")?.value || "07:30";
+  const pagiEnd = document.getElementById("cfg-role-pagi-end")?.value || "15:30";
+  const malamStart = document.getElementById("cfg-role-malam-start")?.value || "13:30";
+  const malamEnd = document.getElementById("cfg-role-malam-end")?.value || "21:00";
+  const tolerance = Number(document.getElementById("cfg-role-tolerance")?.value || 15);
+  const overtimeRate = Number(document.getElementById("cfg-role-overtime-rate")?.value || 25000);
+  const latePenalty = Number(document.getElementById("cfg-role-late-penalty")?.value || 10000);
+  const radiusMeter = Number(document.getElementById("cfg-role-radius-meter")?.value || 100);
+
+  const payload = {
+    pagi_start: pagiStart,
+    pagi_end: pagiEnd,
+    malam_start: malamStart,
+    malam_end: malamEnd,
+    tolerance: tolerance,
+    overtime_rate: overtimeRate,
+    late_penalty: latePenalty,
+    radius_meter: radiusMeter,
+    updated_at: serverTimestamp()
+  };
+
   showLoading(`Menyimpan parameter role ${roleKey.toUpperCase()}...`);
   try {
     await setDoc(doc(db, "app_settings", "parameters_roles"), {
@@ -536,8 +561,8 @@ export async function saveRoleParameters(roleKey, payload) {
     hideLoading();
     notify("Berhasil", `Parameter untuk role ${roleKey.toUpperCase()} berhasil disimpan.`);
     openHRSubPage('hr-params-menu');
-  } catch (e) {
+  } catch (err) {
     hideLoading();
-    notify("Gagal", e.message);
+    notify("Gagal", err.message);
   }
 }
