@@ -1,5 +1,5 @@
 /* ==========================================================================
-   05-FORMS.CSS - INPUTS, BUTTONS, THEME SWITCHES & UTILITIES
+   05-FORMS.CSS - INPUTS, BUTTONS, THEME SWITCHES & ATTENDANCE ACTIONS
    ========================================================================== */
 
 /* LOGIN VIEW */
@@ -21,8 +21,13 @@
 }
 
 .login-brand-typography-hero { 
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   text-align: center; 
   margin-bottom: 2rem; 
+  width: 100%;
 }
 
 .login-hero-title {
@@ -30,27 +35,29 @@
   font-size: 2.35rem;
   font-weight: 900;
   letter-spacing: -0.03em;
-  background: linear-gradient(135deg, var(--text-primary) 30%, #1a4b8b 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--text-primary);
   line-height: 1.1;
+  margin: 0;
+  display: block;
+  text-align: center;
 }
 
 .login-hero-title span {
   background: linear-gradient(135deg, #1a4b8b 0%, #3b82f6 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
+  display: inline;
 }
 
 body.dark-mode .login-hero-title {
-  background: linear-gradient(135deg, #ffffff 40%, #3b82f6 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: #ffffff;
 }
 
 body.dark-mode .login-hero-title span {
   background: linear-gradient(135deg, #3b82f6 0%, #93c5fd 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
@@ -59,13 +66,16 @@ body.dark-mode .login-hero-title span {
   font-weight: 800; 
   color: var(--text-secondary); 
   letter-spacing: 0.3em; 
-  margin-top: 4px; 
+  text-transform: uppercase;
+  margin-top: 6px; 
+  display: block;
+  text-align: center;
 }
 
 .login-hero-divider { 
   width: 36px; 
   height: 3px; 
-  background: var(--text-accent); 
+  background: var(--text-accent, #1a4b8b); 
   border-radius: 2px; 
   margin: 10px auto 0 auto; 
 }
@@ -76,6 +86,7 @@ body.dark-mode .login-hero-title span {
   padding: 1.5rem 1.25rem; 
   border-radius: 20px; 
   box-shadow: var(--shadow-md); 
+  border: 0.5px solid var(--border-color);
 }
 
 .form-center { 
@@ -281,21 +292,53 @@ body.dark-mode textarea:focus {
   transform: scale(0.98); 
 }
 
-.btn-sakit-custom, .btn-izin-custom {
-  padding: 0.65rem;
-  border-radius: var(--radius-md);
-  font-weight: 700;
-  font-size: 0.7rem;
+/* TOMBOL KAPSUL SAKIT & IZIN */
+.btn-sakit-custom, 
+.btn-izin-custom {
+  padding: 0.8rem 0.6rem !important;
+  border-radius: var(--radius-md) !important;
+  font-weight: 800 !important;
+  font-size: 0.72rem !important;
+  letter-spacing: 0.04em !important;
   cursor: pointer;
   width: 100%;
-  border: 0.5px solid var(--border-color);
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 6px;
+  gap: 8px !important;
+  transition: transform 0.15s ease, opacity 0.15s ease, background-color 0.15s ease;
+  border: 0.5px solid transparent !important;
 }
-.btn-sakit-custom { background: rgba(239, 68, 68, 0.12) !important; color: #ef4444 !important; }
-.btn-izin-custom { background: rgba(245, 158, 11, 0.12) !important; color: #f59e0b !important; }
+
+.btn-sakit-custom { 
+  background: rgba(239, 68, 68, 0.12) !important; 
+  color: #ef4444 !important; 
+  border-color: rgba(239, 68, 68, 0.22) !important; 
+}
+
+.btn-izin-custom { 
+  background: rgba(245, 158, 11, 0.12) !important; 
+  color: #f59e0b !important; 
+  border-color: rgba(245, 158, 11, 0.22) !important; 
+}
+
+.btn-sakit-custom:active, 
+.btn-izin-custom:active {
+  transform: scale(0.97);
+  opacity: 0.85;
+}
+
+body.dark-mode .btn-sakit-custom {
+  background: rgba(239, 68, 68, 0.14) !important;
+  color: #f87171 !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+}
+
+body.dark-mode .btn-izin-custom {
+  background: rgba(245, 158, 11, 0.14) !important;
+  color: #fbbf24 !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
 
 .btn-approve-action {
   background-color: var(--text-accent) !important;
@@ -504,6 +547,7 @@ body.dark-mode .btn-monochrome-scan:active {
 
 /* UTILITY CLASSES */
 .text-right { text-align: right; }
+.text-center { text-align: center; }
 .hidden { display: none !important; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
 .gap-sm { gap: 0.4rem; }

@@ -1,5 +1,6 @@
 /* ==========================================================================
-   MYAIWA - PAYROLL, SALARY SLIPS, KASBON & DISBURSEMENT ENGINE
+   SRC/PAYROLL-KASBON.JS - LOGIKA FINANCE (GAJI, KASBON & SLIP)
+   MYAIWA - AIWA RAGIN JAJE SYSTEM
    ========================================================================== */
 
 import { auth, db } from "../firebase-config.js";
@@ -10,19 +11,21 @@ import {
   doc, 
   getDoc, 
   setDoc, 
-  deleteDoc, 
+  deleteDoc,
+  onSnapshot,
   serverTimestamp, 
   query, 
   where, 
-  orderBy, 
-  limit 
+  limit,
+  writeBatch 
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 import { 
   state, 
   ROLE_DISPLAY_NAMES, 
   DEFAULT_ROLE_PARAMS, 
-  CAREER_ALLOWANCE_PRESETS 
+  CAREER_ALLOWANCE_PRESETS,
+  PAYROLL_TERMS 
 } from "./constants.js";
 
 import { 
@@ -31,24 +34,59 @@ import {
   notify, 
   showCustomConfirm, 
   calculateLateThresholdTime, 
-  navigateToTab 
+  navigateToTab,
+  openHRSubPage,
+  formatRupiah,
+  getLocalDateWITA 
 } from "./utils.js";
 
+let isSubmittingKasbonLock = false;
+let hrRequestsCountdownTimer = null;
+let kasbonHistoryCountdownTimer = null;
+let activeQRISSnapshotUnsub = null;
+
+function formatShortDateTime(millis) {
+  if (!millis) return "-";
+  const d = new Date(millis);
+  const dateStr = d.toLocaleDateString("id-ID", {
+    timeZone: "Asia/Makassar",
+    day: "numeric",
+    month: "short",
+    year: "numeric"
+  });
+  const timeStr = d.toLocaleTimeString("id-ID", {
+    timeZone: "Asia/Makassar",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).replace(/\./g, ':');
+  return `${dateStr}, ${timeStr} WITA`;
+}
+
 // ==========================================
-// 1. KOMPILASI & KALKULASI SLIP GAJI
+// 1. KOMPILASI SLIP GAJI (BEBAS COMPOSITE INDEX)
 // ==========================================
-export async function compileEmployeeSlip(userId, monthStr) {
+export async function compileEmployeeSlip(userId, monthStr, customTerm = null) {
   const [userDoc, salDoc, attSnap, reqSnap] = await Promise.all([
     getDoc(doc(db, "users", userId)),
     getDoc(doc(db, "salary_structures", userId)),
-    getDocs(query(collection(db, "attendance"), where("uid", "==", userId))),
-    getDocs(query(collection(db, "employee_requests"), where("uid", "==", userId)))
+    getDocs(query(
+      collection(db, "attendance"),
+      where("uid", "==", userId)
+    )),
+    getDocs(query(
+      collection(db, "employee_requests"), 
+      where("uid", "==", userId)
+    ))
   ]);
 
   const userData = userDoc.exists() ? userDoc.data() : {};
-  const salData = salDoc.exists() ? salDoc.data() : { base_salary: 0, role_allowance: 0, meal_daily: 15000, bank_account: "-" };
+  const salData = salDoc.exists() ? salDoc.data() : { base_salary: 0, role_allowance: 0, meal_daily: 15000, bank_account: "-", payroll_term: "termin_1" };
   const userRoleKey = String(userData.role || 'staff').toLowerCase();
   const roleCfg = state.roleParamsCache[userRoleKey] || DEFAULT_ROLE_PARAMS[userRoleKey] || DEFAULT_ROLE_PARAMS.staff;
+
+  const payrollTermKey = customTerm || salData.payroll_term || userData.payroll_term || "termin_1";
+  const terminConfig = PAYROLL_TERMS[payrollTermKey] || PAYROLL_TERMS.termin_1;
 
   let hadirCount = 0;
   let lateCount = 0;
@@ -119,7 +157,9 @@ export async function compileEmployeeSlip(userId, monthStr) {
     career_level: userData.career_level || "Junior",
     month: monthStr,
     year: monthStr.slice(0, 4),
-    bank: salData.bank_account || "BCA (Auto Transfer)",
+    payroll_term: payrollTermKey,
+    termin_label: terminConfig.name,
+    bank: salData.bank_account || `${salData.bank_name || 'BCA'} - ${salData.bank_number || '-'} a.n ${salData.bank_holder || userData.nama || '-'}`,
     hadir: hadirCount,
     telat: lateCount,
     lemburJam: totalOvertimeHours,
@@ -134,57 +174,79 @@ export async function compileEmployeeSlip(userId, monthStr) {
 }
 
 // ==========================================
-// 2. SLIP BULAN BERJALAN & KUNCI/TERBITKAN SLIP
+// 2. SLIP BULAN BERJALAN & KUNCI SLIP
 // ==========================================
 export async function openMyCurrentPayslip() {
   const user = auth.currentUser;
-  if (!user) return;
+  if (!user) return notify("Perhatian", "Silakan login terlebih dahulu.");
 
-  const currentMonth = new Date().toISOString().slice(0, 7);
-  showLoading("Memuat slip gaji bulan berjalan...");
+  const currentMonth = getLocalDateWITA().slice(0, 7);
+  showLoading();
 
   try {
-    const slipDoc = await getDoc(doc(db, "salary_slips_archive", `${user.uid}_${currentMonth}`));
-    let slipData;
+    const userDoc = await getDoc(doc(db, "users", user.uid));
+    const salDoc = await getDoc(doc(db, "salary_structures", user.uid));
+    const userTerm = salDoc.exists() ? (salDoc.data().payroll_term || "termin_1") : (userDoc.data()?.payroll_term || "termin_1");
 
+    let slipDoc = await getDoc(doc(db, "salary_slips_archive", `${user.uid}_${currentMonth}_${userTerm}`));
+    if (!slipDoc.exists()) {
+      slipDoc = await getDoc(doc(db, "salary_slips_archive", `${user.uid}_${currentMonth}`));
+    }
+
+    let slipData;
     if (slipDoc.exists()) {
       slipData = slipDoc.data();
     } else {
-      slipData = await compileEmployeeSlip(user.uid, currentMonth);
+      slipData = await compileEmployeeSlip(user.uid, currentMonth, userTerm);
     }
 
-    hideLoading();
     openPayslipDetail(slipData);
   } catch (err) {
-    hideLoading();
     notify("Gagal Memuat Slip", err.message);
+  } finally {
+    hideLoading();
   }
 }
 
 export async function lockAndPublishMonthlySlips() {
   const monthStr = document.getElementById("publish-month-picker")?.value;
+  const targetTerm = document.getElementById("publish-termin-picker")?.value || "all";
+
   if (!monthStr) return notify("Perhatian", "Pilih bulan penerbitan slip.");
 
+  const termText = targetTerm === "all" ? "Semua Termin (Termin 1 & 2)" : (targetTerm === "termin_2" ? "Khusus Termin 2 (Tgl 15)" : "Khusus Termin 1 (Tgl 1)");
   const confirmPublish = await showCustomConfirm(
     "Kunci & Terbitkan Slip", 
-    `Terbitkan slip gaji resmi untuk periode ${monthStr}? Saldo kasbon aktif akan otomatis dipotong sesuai skema cicilan.`
+    `Terbitkan slip gaji resmi periode ${monthStr} untuk [${termText}]?`
   );
   if (!confirmPublish) return;
 
-  showLoading("Mengompilasi dan mengarsipkan slip gaji...");
+  showLoading();
 
   try {
-    const [usersSnap, reqSnap] = await Promise.all([
+    const [usersSnap, salSnap, reqSnap] = await Promise.all([
       getDocs(collection(db, "users")),
+      getDocs(collection(db, "salary_structures")),
       getDocs(collection(db, "employee_requests"))
     ]);
 
+    const salMap = {};
+    salSnap.forEach(d => salMap[d.id] = d.data());
+
+    const batch = writeBatch(db);
     let count = 0;
+    const nowTimestamp = serverTimestamp();
 
     for (const uDoc of usersSnap.docs) {
       const uid = uDoc.id;
-      const slipPayload = await compileEmployeeSlip(uid, monthStr);
-      slipPayload.published_at = serverTimestamp();
+      const uData = uDoc.data();
+      const sData = salMap[uid] || {};
+      const userTerm = sData.payroll_term || uData.payroll_term || "termin_1";
+
+      if (targetTerm !== "all" && userTerm !== targetTerm) continue;
+
+      const slipPayload = await compileEmployeeSlip(uid, monthStr, userTerm);
+      slipPayload.published_at = nowTimestamp;
 
       for (const rDoc of reqSnap.docs) {
         const r = rDoc.data();
@@ -196,22 +258,38 @@ export async function lockAndPublishMonthlySlips() {
             const totalPaidBaru = (Number(r.total_paid) || 0) + potonganEfektif;
             const isLunas = ((Number(r.amount) || 0) - totalPaidBaru) <= 0;
 
-            await setDoc(doc(db, "employee_requests", rDoc.id), {
-              total_paid: totalPaidBaru,
-              installment_paid_count: (Number(r.installment_paid_count) || 0) + 1,
-              status: isLunas ? "Settled" : "Approved",
-              last_deducted_month: monthStr
-            }, { merge: true });
+            const reqRef = doc(db, "employee_requests", rDoc.id);
+
+            if (isLunas) {
+              batch.delete(reqRef);
+            } else {
+              batch.update(reqRef, {
+                total_paid: totalPaidBaru,
+                installment_paid_count: (Number(r.installment_paid_count) || 0) + 1,
+                status: "Approved",
+                last_deducted_month: monthStr,
+                last_deducted_termin: userTerm
+              });
+            }
           }
         }
       }
 
-      await setDoc(doc(db, "salary_slips_archive", `${uid}_${monthStr}`), slipPayload, { merge: true });
+      const slipRefTerm = doc(db, "salary_slips_archive", `${uid}_${monthStr}_${userTerm}`);
+      const slipRefBase = doc(db, "salary_slips_archive", `${uid}_${monthStr}`);
+      batch.set(slipRefTerm, slipPayload, { merge: true });
+      batch.set(slipRefBase, slipPayload, { merge: true });
       count++;
     }
 
+    if (count === 0) {
+      hideLoading();
+      return notify("Perhatian", "Tidak ada data karyawan yang cocok dengan termin yang dipilih.");
+    }
+
+    await batch.commit();
     hideLoading();
-    notify("Sukses", `Berhasil mengunci dan menerbitkan ${count} slip gaji untuk periode ${monthStr}.`);
+    notify("Sukses", `Berhasil mengunci dan menerbitkan ${count} slip gaji periode ${monthStr} (${termText}).`);
   } catch (err) {
     hideLoading();
     notify("Gagal Menerbitkan Slip", err.message);
@@ -221,246 +299,86 @@ export async function lockAndPublishMonthlySlips() {
 // ==========================================
 // 3. RIWAYAT ARSIP SLIP GAJI
 // ==========================================
-export function populateSlipYearDropdown() {
-  const selectYear = document.getElementById("filter-slip-year");
-  if (!selectYear) return;
-
-  const currentYear = new Date().getFullYear();
-  selectYear.innerHTML = "";
-
-  for (let i = 0; i < 4; i++) {
-    const yr = currentYear - i;
-    const opt = document.createElement("option");
-    opt.value = String(yr);
-    opt.innerText = String(yr);
-    if (i === 0) opt.selected = true;
-    selectYear.appendChild(opt);
-  }
-}
-
 export async function renderUserSlipHistory() {
   const user = auth.currentUser;
-  if (!user) return;
+  const container = document.getElementById("user-slip-history-container") || document.getElementById("user-slip-history-list");
+  if (!container) return;
 
-  const yearSelect = document.getElementById("filter-slip-year");
-  if (!yearSelect || yearSelect.children.length === 0) {
-    populateSlipYearDropdown();
+  if (!user) {
+    container.innerHTML = "<p class='placeholder-text'>Silakan login untuk melihat arsip slip.</p>";
+    return;
   }
 
-  const selectedYear = document.getElementById("filter-slip-year")?.value || String(new Date().getFullYear());
-  const selectedMonth = document.getElementById("filter-slip-month")?.value || "all";
-  const container = document.getElementById("user-slip-history-list");
-  const countBadge = document.getElementById("history-total-count");
-
-  if (!container) return;
   container.innerHTML = "<p class='placeholder-text'>Memuat arsip slip gaji...</p>";
 
   try {
     const snap = await getDocs(query(
       collection(db, "salary_slips_archive"),
       where("uid", "==", user.uid),
-      where("month", ">=", `${selectedYear}-01`),
-      where("month", "<=", `${selectedYear}-12`),
-      orderBy("month", "desc"),
-      limit(12)
+      limit(30)
     ));
 
-    let slips = [];
-    snap.forEach(d => {
-      const item = { id: d.id, ...d.data() };
-      if (selectedMonth === "all" || item.month.endsWith(`-${selectedMonth}`)) {
-        slips.push(item);
-      }
-    });
-
-    if (countBadge) countBadge.innerText = `${slips.length} / 12 Dokumen`;
-
-    if (slips.length === 0) {
-      container.innerHTML = `<p class='placeholder-text'>Belum ada arsip slip resmi untuk periode ${selectedYear}${selectedMonth !== 'all' ? '-' + selectedMonth : ''}.</p>`;
+    if (snap.empty) {
+      container.innerHTML = "<p class='placeholder-text'>Belum ada arsip slip gaji resmi.</p>";
       return;
     }
 
-    container.innerHTML = "";
-    slips.forEach(slip => {
-      const div = document.createElement("div");
-      div.className = "picker-user-row";
-      div.style.cursor = "pointer";
-      div.onclick = () => openPayslipDetail(slip);
+    let slips = [];
+    snap.forEach(d => slips.push({ id: d.id, ...d.data() }));
+    slips.sort((a, b) => (b.month || "").localeCompare(a.month || ""));
 
-      div.innerHTML = `
-        <div class="picker-user-meta">
-          <strong>Periode: ${slip.month}</strong>
-          <small>Take Home Pay: Rp ${Number(slip.takeHomePay).toLocaleString()}</small>
+    container.innerHTML = slips.map(slip => {
+      const termLabel = slip.termin_label || (slip.payroll_term === "termin_2" ? "Termin 2 (Tgl 15)" : "Termin 1 (Tgl 1)");
+      const thpVal = slip.takeHomePay !== undefined ? slip.takeHomePay : (slip.thp || 0);
+
+      return `
+        <div class="picker-user-row" style="margin-bottom: 6px; cursor: pointer;" onclick="openPayslipDetail(${JSON.stringify(slip).replace(/"/g, '&quot;')})">
+          <div class="picker-user-meta">
+            <strong>Periode: ${slip.month || "-"} · <span style="color:var(--text-accent);">${termLabel}</span></strong>
+            <small>Take Home Pay: <b>${formatRupiah(thpVal)}</b></small>
+          </div>
+          <button type="button" class="btn-primary" style="padding:4px 8px; font-size:0.6rem; flex-shrink:0;">Buka Slip</button>
         </div>
-        <button class="btn-primary" style="padding:4px 8px; font-size:0.6rem;">Buka Slip</button>
       `;
-      container.appendChild(div);
-    });
+    }).join("");
   } catch (e) {
-    const fallbackSnap = await getDocs(query(
-      collection(db, "salary_slips_archive"),
-      where("uid", "==", user.uid),
-      limit(24)
-    ));
-
-    let slips = [];
-    fallbackSnap.forEach(d => {
-      const item = { id: d.id, ...d.data() };
-      if (item.month && item.month.startsWith(selectedYear)) {
-        if (selectedMonth === "all" || item.month.endsWith(`-${selectedMonth}`)) {
-          slips.push(item);
-        }
-      }
-    });
-
-    slips.sort((a, b) => b.month.localeCompare(a.month));
-    slips = slips.slice(0, 12);
-
-    if (countBadge) countBadge.innerText = `${slips.length} / 12 Dokumen`;
-
-    if (slips.length === 0) {
-      container.innerHTML = `<p class='placeholder-text'>Belum ada arsip slip resmi untuk periode ${selectedYear}.</p>`;
-      return;
-    }
-
-    container.innerHTML = "";
-    slips.forEach(slip => {
-      const div = document.createElement("div");
-      div.className = "picker-user-row";
-      div.style.cursor = "pointer";
-      div.onclick = () => openPayslipDetail(slip);
-
-      div.innerHTML = `
-        <div class="picker-user-meta">
-          <strong>Periode: ${slip.month}</strong>
-          <small>Take Home Pay: Rp ${Number(slip.takeHomePay).toLocaleString()}</small>
-        </div>
-        <button class="btn-primary" style="padding:4px 8px; font-size:0.6rem;">Buka Slip</button>
-      `;
-      container.appendChild(div);
-    });
+    container.innerHTML = `<p class='placeholder-text text-danger'>Gagal memuat: ${e.message}</p>`;
   }
 }
 
-// ==========================================
-// 4. DETAIL TAMPILAN SLIP GAJI
-// ==========================================
 export function openPayslipDetail(data) {
   if (!data) return;
   state.currentPayslipCache = data;
-  const box = document.getElementById("payslip-page-content-box");
-  const sigName = document.getElementById("payslip-sig-name");
-  const docIdEl = document.getElementById("slip-meta-doc-id");
-  if (!box) return;
-
-  const docCode = `DOC-${data.month.replace("-", "")}-${data.uid.slice(0, 5).toUpperCase()}`;
-  if (sigName) sigName.innerText = data.nama || "Karyawan";
-  if (docIdEl) docIdEl.innerText = docCode;
 
   const rawRole = String(data.role || 'staff').toLowerCase();
   const displayRole = (ROLE_DISPLAY_NAMES[rawRole] || rawRole).toUpperCase();
+  const termLabel = data.termin_label || (data.payroll_term === "termin_2" ? "Termin 2 (Tanggal 15)" : "Termin 1 (Tanggal 1)");
+  const thpVal = data.takeHomePay !== undefined ? data.takeHomePay : (data.thp || 0);
 
-  box.innerHTML = `
-    <div class="corp-slip-divider"></div>
+  state.activeCalculatedTHP = thpVal;
+  state.activeSlipPeriod = data.month || getLocalDateWITA().slice(0, 7);
 
-    <div class="payslip-meta-grid">
-      <div class="payslip-meta-item">
-        <small>NAMA STAF</small>
-        <strong>${data.nama}</strong>
-      </div>
-      <div class="payslip-meta-item">
-        <small>JABATAN / ROLE</small>
-        <strong>${displayRole} (${(data.career_level || 'Junior').toUpperCase()})</strong>
-      </div>
-      <div class="payslip-meta-item">
-        <small>PERIODE GAJI</small>
-        <strong>${data.month}</strong>
-      </div>
-      <div class="payslip-meta-item">
-        <small>REKENING PENERIMA</small>
-        <strong>${data.bank || '-'}</strong>
-      </div>
-    </div>
+  const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
+  setTxt("payslip-termin-badge", termLabel.toUpperCase());
+  setTxt("payslip-period-label", `Periode: ${data.month || '-'} (${termLabel})`);
+  setTxt("payslip-employee-meta", `${data.nama || 'Karyawan'} [${displayRole}]`);
 
-    <div class="payslip-section-heading">RINCIAN PENGHASILAN (INCOME)</div>
-    <div class="payslip-item-row">
-      <span>Gaji Pokok</span>
-      <strong>Rp ${(data.baseSalary || 0).toLocaleString()}</strong>
-    </div>
-    <div class="payslip-item-row">
-      <span>Tunjangan Jabatan</span>
-      <strong>Rp ${(data.roleAllowance || 0).toLocaleString()}</strong>
-    </div>
-    <div class="payslip-item-row">
-      <span>Uang Makan (${data.hadir || 0} Hari)</span>
-      <strong>Rp ${(data.mealTotal || 0).toLocaleString()}</strong>
-    </div>
-    ${(data.overtimePay > 0) ? `
-      <div class="payslip-item-row" style="color:#1A4B8B;">
-        <span>Upah Lembur (${data.lemburJam || 0} Jam)</span>
-        <strong>+ Rp ${data.overtimePay.toLocaleString()}</strong>
-      </div>
-    ` : ''}
+  setTxt("slip-val-base", formatRupiah(data.baseSalary || data.base_salary || 0));
+  setTxt("slip-label-meal", `Uang Makan (${data.hadir || data.hadir_days || 0} Hari):`);
+  setTxt("slip-val-meal", formatRupiah(data.mealTotal || data.meal_total || 0));
+  setTxt("slip-val-allowance", formatRupiah(data.roleAllowance || data.allowance || 0));
+  setTxt("slip-val-overtime", formatRupiah(data.overtimePay || data.overtime || 0));
 
-    <div class="payslip-section-heading">POTONGAN (DEDUCTION)</div>
-    <div class="payslip-item-row text-deduct">
-      <span>Denda Keterlambatan (${data.telat || 0}x)</span>
-      <strong>- Rp ${(data.latePenaltyTotal || 0).toLocaleString()}</strong>
-    </div>
-    <div class="payslip-item-row text-deduct">
-      <span>Pinjaman Kasbon</span>
-      <strong>- Rp ${(data.kasbon || 0).toLocaleString()}</strong>
-    </div>
-
-    <div class="payslip-total-block">
-      <span>GAJI BERSIH (TAKE HOME PAY)</span>
-      <strong>Rp ${(data.takeHomePay || 0).toLocaleString()}</strong>
-    </div>
-  `;
-
-  const btnClaim = document.getElementById("btn-claim-salary-action");
-  const claimLabel = document.getElementById("claim-btn-label");
-
-  if (btnClaim && claimLabel) {
-    const isPublished = Boolean(data.published_at);
-    const isBankRegistered = data.bank && data.bank !== "-" && !data.bank.includes("Belum");
-
-    if (!isPublished) {
-      btnClaim.disabled = true;
-      btnClaim.style.background = "#8e8e93";
-      btnClaim.style.cursor = "not-allowed";
-      claimLabel.innerText = "Tahap Administrasi";
-    } else if (!isBankRegistered && data.disbursement_method === "transfer") {
-      btnClaim.disabled = true;
-      btnClaim.style.background = "#ff9500";
-      btnClaim.style.cursor = "not-allowed";
-      claimLabel.innerText = "Rekening Belum Diverifikasi GM";
-    } else if (data.disbursement_status === "Paid" || data.disbursement_status === "Claimed") {
-      btnClaim.disabled = true;
-      btnClaim.style.background = "#34c759";
-      claimLabel.innerText = "Gaji Sudah Dicairkan ✓";
-    } else if (data.disbursement_status === "Waiting_Cash_Scan") {
-      btnClaim.disabled = false;
-      btnClaim.style.background = "var(--text-accent)";
-      claimLabel.innerText = `Lihat QR Pencairan (${data.voucher_code || 'Tunai'})`;
-      btnClaim.onclick = () => showQRReceipt(data.voucher_code || "AIWA-CASH", data);
-    } else if (data.disbursement_status === "Pending_Transfer") {
-      btnClaim.disabled = true;
-      btnClaim.style.background = "#ff9500";
-      claimLabel.innerText = "Menunggu Verifikasi Transfer GM";
-    } else {
-      btnClaim.disabled = false;
-      btnClaim.style.background = "var(--text-accent)";
-      claimLabel.innerText = "Tarik Gaji Ini";
-      btnClaim.onclick = () => openClaimSalaryPage();
-    }
-  }
+  setTxt("slip-label-late", `Keterlambatan (${data.telat || data.late_count || 0}x):`);
+  setTxt("slip-val-late", formatRupiah(data.latePenaltyTotal || data.late_penalty || 0));
+  setTxt("slip-val-kasbon", formatRupiah(data.kasbon || data.kasbon_deduction || 0));
+  setTxt("slip-val-thp", formatRupiah(thpVal));
 
   navigateToTab('payslip-page', true);
 }
 
 // ==========================================
-// 5. KLAIM & PENCAIRAN GAJI
+// 4. KLAIM & PENCAIRAN GAJI
 // ==========================================
 export async function openClaimSalaryPage() {
   if (!state.currentPayslipCache) return notify("Perhatian", "Data slip tidak ditemukan.");
@@ -471,89 +389,56 @@ export async function openClaimSalaryPage() {
 
   try {
     const salDoc = await getDoc(doc(db, "salary_structures", state.currentPayslipCache.uid));
-    const registeredAcc = salDoc.exists() ? (salDoc.data().bank_account || "-") : "-";
+    const registeredAcc = salDoc.exists() ? (salDoc.data().bank_account || `${salDoc.data().bank_name} - ${salDoc.data().bank_number}`) : "-";
     
-    const regLabelEl = document.getElementById("registered-bank-info-label");
+    const regLabelEl = document.getElementById("claim-bank-account-target");
     if (regLabelEl) {
       regLabelEl.innerText = registeredAcc !== "-" ? registeredAcc : "Belum didaftarkan oleh GM";
     }
+
+    const totalEl = document.getElementById("claim-total-amount-display");
+    if (totalEl) totalEl.innerText = formatRupiah(state.currentPayslipCache.takeHomePay || state.currentPayslipCache.thp || 0);
+
+    const periodEl = document.getElementById("claim-period-display");
+    if (periodEl) periodEl.innerText = `Periode: ${state.currentPayslipCache.month}`;
   } catch (e) {
     console.warn("Gagal memuat rekening terdaftar:", e);
   }
 
-  selectDisbursementMethod("cash");
+  selectDisbursementMethod("transfer");
   navigateToTab("claim-salary");
 }
 
 export function selectDisbursementMethod(method) {
   state.selectedDisbursementType = method;
-  const cardCash = document.getElementById("card-method-cash");
-  const cardTransfer = document.getElementById("card-method-transfer");
-  const boxCash = document.getElementById("box-cash-detail");
-  const boxTransfer = document.getElementById("box-transfer-detail");
+  const cardCash = document.getElementById("method-card-tunai");
+  const cardTransfer = document.getElementById("method-card-transfer");
+  const boxTransfer = document.getElementById("box-claim-bank-info");
 
-  if (method === "cash") {
+  if (method === "tunai") {
     cardCash?.classList.add("active-method");
     cardTransfer?.classList.remove("active-method");
-    boxCash?.classList.remove("hidden");
     boxTransfer?.classList.add("hidden");
   } else {
     cardTransfer?.classList.add("active-method");
     cardCash?.classList.remove("active-method");
     boxTransfer?.classList.remove("hidden");
-    boxCash?.classList.add("hidden");
   }
 }
 
-export async function submitSalaryDisbursement() {
+export async function submitSalaryDisbursement(e) {
+  if (e) e.preventDefault();
   if (!state.currentPayslipCache) return;
   const user = auth.currentUser;
   if (!user) return;
 
   const now = Date.now();
   const expiresAtMillis = now + (24 * 60 * 60 * 1000);
-  const slipKey = `${state.currentPayslipCache.uid}_${state.currentPayslipCache.month}`;
-  const voucherCode = `AIWA-${state.currentPayslipCache.month.replace("-", "")}-${Math.floor(1000 + Math.random() * 9000)}`;
+  const termSuffix = state.currentPayslipCache.payroll_term === "termin_2" ? "T2" : "T1";
+  const slipKey = `${state.currentPayslipCache.uid}_${state.currentPayslipCache.month}_${state.currentPayslipCache.payroll_term || 'termin_1'}`;
+  const voucherCode = `AIWA-${(state.currentPayslipCache.month || '202608').replace("-", "")}-${termSuffix}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-  let bankNote = "Pencairan TUNAI di Kantor Finance";
-
-  if (state.selectedDisbursementType === "transfer") {
-    const bankName = document.getElementById("transfer-bank-select")?.value;
-    const accNum = document.getElementById("transfer-acc-number")?.value.trim();
-    const accName = document.getElementById("transfer-acc-name")?.value.trim();
-
-    if (!accNum || !accName) {
-      return notify("Perhatian", "Lengkapi nomor rekening dan nama pemilik rekening.");
-    }
-
-    showLoading("Memverifikasi kecocokan rekening...");
-
-    try {
-      const salDoc = await getDoc(doc(db, "salary_structures", user.uid));
-      if (!salDoc.exists() || !salDoc.data().bank_number) {
-        hideLoading();
-        return notify("Rekening Belum Terdaftar", "Rekening Anda belum didaftarkan di sistem oleh GM. Silakan hubungi GM/HR terlebih dahulu.");
-      }
-
-      const regData = salDoc.data();
-      const registeredNumber = String(regData.bank_number).trim();
-
-      if (accNum !== registeredNumber) {
-        hideLoading();
-        return notify(
-          "Rekening Tidak Cocok", 
-          `Nomor rekening (${accNum}) tidak cocok dengan data resmi yang didaftarkan GM (${regData.bank_name} - ${registeredNumber} a.n ${regData.bank_holder}).`
-        );
-      }
-
-      bankNote = `Transfer Bank: ${bankName} - ${accNum} a.n ${accName}`;
-    } catch (err) {
-      hideLoading();
-      return notify("Gagal Validasi", err.message);
-    }
-  }
-
-  showLoading("Memproses pengajuan penarikan...");
+  showLoading();
 
   try {
     const claimPayload = {
@@ -561,11 +446,13 @@ export async function submitSalaryDisbursement() {
       nama: state.currentPayslipCache.nama,
       role: state.currentPayslipCache.role,
       month: state.currentPayslipCache.month,
-      amount: state.currentPayslipCache.takeHomePay,
-      method: state.selectedDisbursementType,
+      payroll_term: state.currentPayslipCache.payroll_term || "termin_1",
+      termin_label: state.currentPayslipCache.termin_label || "Termin 1",
+      amount: state.currentPayslipCache.takeHomePay || state.currentPayslipCache.thp,
+      method: state.selectedDisbursementType || "transfer",
       voucher_code: voucherCode,
-      note: `Pencairan ${state.selectedDisbursementType.toUpperCase()} (Kode: ${voucherCode}) - ${bankNote}`,
-      disbursement_status: state.selectedDisbursementType === "cash" ? "Waiting_Cash_Scan" : "Pending_Transfer",
+      note: `Pencairan ${(state.selectedDisbursementType || 'transfer').toUpperCase()} (${state.currentPayslipCache.termin_label || 'Termin 1'})`,
+      disbursement_status: state.selectedDisbursementType === "tunai" ? "Waiting_Cash_Scan" : "Pending_Transfer",
       status: "Pending",
       requested_at: serverTimestamp(),
       requested_millis: now,
@@ -580,7 +467,7 @@ export async function submitSalaryDisbursement() {
     await setDoc(doc(db, "salary_slips_archive", slipKey), {
       ...state.currentPayslipCache,
       disbursement_status: claimPayload.disbursement_status,
-      disbursement_method: state.selectedDisbursementType,
+      disbursement_method: claimPayload.method,
       voucher_code: voucherCode,
       expires_at_millis: expiresAtMillis
     }, { merge: true });
@@ -591,10 +478,10 @@ export async function submitSalaryDisbursement() {
 
     hideLoading();
 
-    if (state.selectedDisbursementType === "cash") {
+    if (claimPayload.method === "tunai") {
       showQRReceipt(voucherCode, state.currentPayslipCache);
     } else {
-      notify("Pengajuan Terkirim", "Nomor rekening terverifikasi cocok! Pengajuan transfer telah diteruskan ke GM (Berlaku 1x24 Jam).");
+      notify("Pengajuan Terkirim", "Pengajuan transfer telah diteruskan ke GM.");
       navigateToTab("payslip-page");
     }
 
@@ -618,7 +505,7 @@ export function showQRReceipt(voucherCode, slipData) {
     const expDate = new Date(slipData.expires_at_millis);
     const expTimeStr = expDate.toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' });
     const expDateStr = expDate.toLocaleDateString("id-ID", { day: 'numeric', month: 'short' });
-    expiryEl.innerHTML = `Batas Berlaku: <b style="color:#ff3b30;">${expDateStr}, ${expTimeStr} WITA (1x24 Jam)</b>`;
+    expiryEl.innerHTML = `Batas Berlaku: <b style="color:#ef4444;">${expDateStr}, ${expTimeStr} WITA (1x24 Jam)</b>`;
   }
 
   if (qrContainer) {
@@ -631,7 +518,8 @@ export function showQRReceipt(voucherCode, slipData) {
           uid: slipData.uid,
           nama: slipData.nama,
           month: slipData.month,
-          thp: slipData.takeHomePay,
+          term: slipData.payroll_term || "termin_1",
+          thp: slipData.takeHomePay || slipData.thp,
           exp: slipData.expires_at_millis
         }),
         width: 160,
@@ -651,34 +539,507 @@ export function closeQRReceiptModal() {
 }
 
 // ==========================================
-// 6. SCANNER GM UNTUK VALIDASI TRANSAKSI
+// 5. SISTEM KASBON DENGAN PLAFON TIERING
+// ==========================================
+export function getKasbonTierLimits(userData) {
+  const level = String(userData.career_level || "Junior").toLowerCase();
+  const rawRole = String(userData.role || "staff").toLowerCase();
+  const baseSalary = Number(userData.salary_base ?? (userData.base_salary ?? 2500000));
+
+  let maxPercent = 0.30;
+  let maxTenor = 1;
+
+  if (rawRole === "it") {
+    maxPercent = 0.80;
+    maxTenor = 3;
+  } else if (level.includes("lead") || rawRole === "gm") {
+    maxPercent = 0.70;
+    maxTenor = 3;
+  } else if (level.includes("senior")) {
+    maxPercent = 0.50;
+    maxTenor = 2;
+  }
+
+  const maxPlafon = Math.floor(baseSalary * maxPercent);
+  return { maxPlafon, maxTenor, maxPercent, levelTitle: rawRole === "it" ? "IT Specialist" : (userData.career_level || "Junior") };
+}
+
+export function openKasbonForm(actionType) {
+  const formBox = document.getElementById("box-form-kasbon");
+  const titleEl = document.getElementById("kasbon-form-title");
+  const labelEl = document.getElementById("kasbon-amount-label");
+  const typeInput = document.getElementById("kasbon-action-type");
+  const cicilanBox = document.getElementById("box-kasbon-tenor-wrapper");
+  const tenorSelect = document.getElementById("kasbon-tenor-months");
+  const submitBtn = document.getElementById("btn-submit-kasbon-form");
+  const uData = state.currentUserData || {};
+  const userRole = String(uData.role || "staff").toLowerCase();
+
+  if (!formBox) return;
+
+  if (actionType === "pinjam") {
+    const isITAccount = userRole === "it";
+    const currentKPIStatus = document.getElementById("kpi-status-tag")?.innerText?.trim().toLowerCase() || "memuaskan";
+    const currentKPIScore = document.getElementById("kpi-score-badge")?.innerText?.trim() || "100%";
+
+    if (!isITAccount && currentKPIStatus === "kurang") {
+      return notify(
+        "Akses Kasbon Terkunci",
+        `Pengajuan pinjaman kasbon membutuhkan performa kehadiran KPI yang baik.\n\nStatus KPI Anda saat ini: ${currentKPIStatus.toUpperCase()} (${currentKPIScore}).`
+      );
+    }
+
+    const { maxPlafon, maxTenor, levelTitle } = getKasbonTierLimits(uData);
+
+    if (titleEl) titleEl.innerText = `Pengajuan Pinjaman Kasbon [${levelTitle}]`;
+    if (labelEl) labelEl.innerText = `NOMINAL PINJAMAN (MAKS ${formatRupiah(maxPlafon)})`;
+    if (cicilanBox) cicilanBox.classList.remove("hidden");
+
+    if (tenorSelect) {
+      tenorSelect.innerHTML = "";
+      for (let m = 1; m <= maxTenor; m++) {
+        const opt = document.createElement("option");
+        opt.value = String(m);
+        opt.innerText = m === 1 ? "1 Bulan (Lunas Langsung)" : `${m} Bulan (${m}x Potong Gaji)`;
+        tenorSelect.appendChild(opt);
+      }
+    }
+
+    if (submitBtn) submitBtn.innerText = "Kirim Pengajuan Kasbon";
+  } else {
+    const sisaKasbonAktif = Number(state.currentUserKasbonBalance ?? 0);
+    const balanceText = document.getElementById("kasbon-current-balance-display")?.innerText || "Rp 0";
+    const balanceParsed = parseInt(balanceText.replace(/[^0-9]/g, "")) || 0;
+
+    if (sisaKasbonAktif <= 0 && balanceParsed <= 0) {
+      return notify("Informasi", "Anda tidak memiliki kasbon aktif.");
+    }
+
+    if (titleEl) titleEl.innerText = "Formulir Setor Kasbon";
+    if (labelEl) labelEl.innerText = "NOMINAL SETORAN (RP)";
+    if (cicilanBox) cicilanBox.classList.add("hidden");
+    if (submitBtn) submitBtn.innerText = "Kirim Setoran Kasbon";
+  }
+
+  if (typeInput) typeInput.value = actionType;
+  const amtInput = document.getElementById("kasbon-amount-input");
+  const noteInput = document.getElementById("kasbon-notes-input");
+  if (amtInput) amtInput.value = "";
+  if (noteInput) noteInput.value = "";
+
+  calculateKasbonInstallment();
+  formBox.classList.remove("hidden");
+  formBox.scrollIntoView({ behavior: "smooth" });
+}
+
+export function closeKasbonForm() {
+  document.getElementById("box-form-kasbon")?.classList.add("hidden");
+}
+
+export function calculateKasbonInstallment() {
+  const amount = Number(document.getElementById("kasbon-amount-input")?.value || 0);
+  const tenor = Number(document.getElementById("kasbon-tenor-months")?.value || 1);
+  const monthlyDisplay = document.getElementById("kasbon-monthly-installment");
+  if (!monthlyDisplay) return;
+
+  const installment = Math.ceil(amount / tenor);
+  monthlyDisplay.value = formatRupiah(installment);
+}
+
+export async function submitKasbonTransaction(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  if (isSubmittingKasbonLock) return;
+
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const uData = state.currentUserData || {};
+  const actionType = document.getElementById("kasbon-action-type")?.value || "pinjam";
+  const amount = Number(document.getElementById("kasbon-amount-input")?.value || 0);
+  const tenor = Number(document.getElementById("kasbon-tenor-months")?.value || 1);
+  const notes = document.getElementById("kasbon-notes-input")?.value.trim();
+  const submitBtn = document.getElementById("btn-submit-kasbon-form");
+
+  if (amount < 10000) return notify("Perhatian", "Nominal minimal transaksi adalah Rp 10.000.");
+  if (!notes) return notify("Perhatian", "Tuliskan keterangan keperluan.");
+
+  if (actionType === "pinjam") {
+    const { maxPlafon, levelTitle } = getKasbonTierLimits(uData);
+    if (amount > maxPlafon) {
+      return notify(
+        "Melebihi Plafon Maksimal",
+        `Batas pinjaman kasbon untuk level ${levelTitle} adalah ${formatRupiah(maxPlafon)}.\nSilakan sesuaikan nominal yang Anda ajukan.`
+      );
+    }
+  }
+
+  isSubmittingKasbonLock = true;
+  if (submitBtn) submitBtn.disabled = true;
+  showLoading();
+
+  try {
+    const todayStr = getLocalDateWITA();
+    const typeLabel = actionType === "pinjam" ? "Kasbon" : "Bayar Kasbon";
+    const now = Date.now();
+    const expiresAtMillis = now + (60 * 60 * 1000);
+    const prefixCode = actionType === "pinjam" ? "KB" : "BYR";
+    const voucherCode = `${prefixCode}-${todayStr.replace(/-/g, "")}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const transPayload = {
+      uid: user.uid,
+      nama: uData.nama || user.email,
+      role: String(uData.role || "staff").toLowerCase(),
+      career_level: uData.career_level || "Junior",
+      type: typeLabel,
+      amount: amount,
+      tenor_months: actionType === "pinjam" ? tenor : 1,
+      monthly_installment: actionType === "pinjam" ? Math.ceil(amount / tenor) : 0,
+      installment_paid_count: 0,
+      total_paid: 0,
+      note: notes,
+      voucher_code: voucherCode,
+      status: "Pending",
+      requested_at: serverTimestamp(),
+      requested_millis: now,
+      expires_at_millis: expiresAtMillis
+    };
+
+    const docRef = await addDoc(collection(db, "employee_requests"), transPayload);
+
+    closeKasbonForm();
+    hideLoading();
+
+    openKasbonQRISPage(voucherCode, expiresAtMillis, transPayload, docRef.id);
+    loadKasbonAccountSummary();
+  } catch (err) {
+    hideLoading();
+    notify("Gagal Transaksi", err.message);
+  } finally {
+    setTimeout(() => {
+      isSubmittingKasbonLock = false;
+      if (submitBtn) submitBtn.disabled = false;
+    }, 800);
+  }
+}
+
+export async function loadKasbonAccountSummary() {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const displaySisa = document.getElementById("kasbon-current-balance-display");
+  const displayPinjaman = document.getElementById("kasbon-total-borrowed-display");
+  const displayPelunasan = document.getElementById("kasbon-total-repaid-display");
+  const historyList = document.getElementById("kasbon-history-list");
+
+  try {
+    const snap = await getDocs(query(
+      collection(db, "employee_requests"),
+      where("uid", "==", user.uid)
+    ));
+
+    let totalPinjaman = 0;
+    let totalPelunasan = 0;
+    let rawItems = [];
+    const now = Date.now();
+    const batch = writeBatch(db);
+    let hasExpiredBatch = false;
+
+    for (const docSnap of snap.docs) {
+      const item = { id: docSnap.id, ...docSnap.data() };
+      if (item.type === "Kasbon" || item.type === "Bayar Kasbon") {
+        
+        // Auto-Expired QRIS
+        if (item.status === "Pending" && item.expires_at_millis && now > item.expires_at_millis) {
+          item.status = "Expired";
+          item.expired_at_millis = item.expires_at_millis;
+          batch.update(doc(db, "employee_requests", item.id), { status: "Expired", expired_at_millis: now });
+          hasExpiredBatch = true;
+        }
+
+        // Auto-Delete Rejected dalam 1 Menit
+        if (item.status === "Rejected") {
+          const deleteAt = (item.rejected_at_millis || item.requested_millis || now) + 60000;
+          if (now >= deleteAt) {
+            deleteDoc(doc(db, "employee_requests", item.id)).catch(() => {});
+            continue;
+          }
+        }
+
+        // Akumulasi Total Pinjaman & Pelunasan
+        if (item.type === "Kasbon" && (item.status === "Approved" || item.status === "Settled")) {
+          totalPinjaman += Number(item.amount || 0);
+          totalPelunasan += Number(item.total_paid || 0);
+        } else if (item.type === "Bayar Kasbon" && (item.status === "Approved" || item.status === "Settled")) {
+          totalPelunasan += Number(item.amount || 0);
+        }
+
+        rawItems.push(item);
+      }
+    }
+
+    if (hasExpiredBatch) {
+      batch.commit().catch(console.warn);
+    }
+
+    const sisaKasbon = Math.max(0, totalPinjaman - totalPelunasan);
+    state.currentUserKasbonBalance = sisaKasbon;
+
+    // HAPUS PERMANEN DOKUMEN JIKA SALDO LUNAS TOTAL
+    if (sisaKasbon === 0 && totalPinjaman > 0) {
+      const cleanupBatch = writeBatch(db);
+      let countDeleted = 0;
+
+      rawItems.forEach(item => {
+        if (item.status === "Approved" || item.status === "Settled") {
+          cleanupBatch.delete(doc(db, "employee_requests", item.id));
+          countDeleted++;
+        }
+      });
+
+      if (countDeleted > 0) {
+        await cleanupBatch.commit();
+      }
+
+      totalPinjaman = 0;
+      totalPelunasan = 0;
+      rawItems = rawItems.filter(item => item.status !== "Approved" && item.status !== "Settled");
+    }
+
+    if (displaySisa) displaySisa.innerText = formatRupiah(sisaKasbon);
+    if (displayPinjaman) displayPinjaman.innerText = formatRupiah(totalPinjaman);
+    if (displayPelunasan) displayPelunasan.innerText = formatRupiah(totalPelunasan);
+
+    if (!historyList) return;
+
+    const transactions = rawItems.filter(t => {
+      if (sisaKasbon === 0 && (t.status === "Approved" || t.status === "Settled")) {
+        return false;
+      }
+      return true;
+    });
+
+    if (transactions.length === 0) {
+      historyList.innerHTML = "<p class='placeholder-text'>Belum ada transaksi kasbon aktif.</p>";
+      return;
+    }
+
+    transactions.sort((a, b) => (b.requested_millis || 0) - (a.requested_millis || 0));
+
+    historyList.innerHTML = transactions.map(t => {
+      const isPinjam = t.type === "Kasbon";
+      const isPending = t.status === "Pending";
+      const isRejected = t.status === "Rejected";
+      const amountColor = isPinjam ? "#f59e0b" : "#10b981";
+      const prefix = isPinjam ? "+ " : "- ";
+      const formattedTime = formatShortDateTime(t.requested_millis || t.timestamp?.toMillis?.());
+
+      let badgeBg = "rgba(16, 185, 129, 0.12)";
+      let badgeColor = "#10b981";
+      let statusLabel = t.status.toUpperCase();
+
+      if (isPending) {
+        badgeBg = "rgba(245, 158, 11, 0.15)";
+        badgeColor = "#f59e0b";
+      } else if (isRejected) {
+        badgeBg = "rgba(239, 68, 68, 0.15)";
+        badgeColor = "#ef4444";
+        const deleteAt = (t.rejected_at_millis || t.requested_millis || Date.now()) + 60000;
+        const remainSec = Math.max(0, Math.ceil((deleteAt - Date.now()) / 1000));
+        statusLabel = `REJECTED (${remainSec}s)`;
+      } else if (t.status === "Expired") {
+        badgeBg = "rgba(239, 68, 68, 0.15)";
+        badgeColor = "#ef4444";
+      }
+
+      const clickHandler = isPending 
+        ? `onclick="openKasbonQRISPage('${t.voucher_code}', ${t.expires_at_millis}, ${JSON.stringify(t).replace(/"/g, '&quot;')}, '${t.id}')"`
+        : '';
+
+      const pendingHint = isPending ? `<small class="text-accent font-700" style="font-size:0.58rem; margin-top:2px;">• Sentuh untuk lihat QR</small>` : '';
+
+      return `
+        <div class="picker-user-row" style="margin-bottom:6px; cursor:${isPending ? 'pointer' : 'default'}; justify-content:space-between; align-items:center;" ${clickHandler}>
+          <div class="picker-user-meta" style="flex:1;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <strong>${t.type === "Kasbon" ? "Pinjaman Kasbon" : "Setoran Kasbon"}</strong>
+              <span class="badge-status-work" style="background:${badgeBg}; color:${badgeColor}; font-size:0.52rem; padding:2px 5px;">${statusLabel}</span>
+            </div>
+            <small>${t.note || '-'} · <b style="color:var(--text-primary);">${formattedTime}</b></small>
+            ${pendingHint}
+          </div>
+          <strong style="font-size:0.85rem; color:${amountColor}; flex-shrink:0;">${prefix}${formatRupiah(t.amount || 0)}</strong>
+        </div>
+      `;
+    }).join("");
+
+    if (kasbonHistoryCountdownTimer) clearInterval(kasbonHistoryCountdownTimer);
+    if (transactions.some(t => t.status === "Rejected")) {
+      kasbonHistoryCountdownTimer = setInterval(() => {
+        loadKasbonAccountSummary();
+      }, 1000);
+    }
+
+  } catch (err) {
+    console.warn("Gagal load kasbon:", err);
+  }
+}
+
+// ==========================================
+// 6. LAMAN PENUH QRIS KASBON & REALTIME APPROVAL
+// ==========================================
+export function openKasbonQRISPage(voucherCode, expiresAtMillis, transData, docId = null) {
+  const titleEl = document.getElementById("qris-page-type-title");
+  const codeEl = document.getElementById("qris-page-voucher-code");
+  const amtEl = document.getElementById("qris-page-amount");
+  const timerEl = document.getElementById("qris-page-countdown-timer");
+  const qrContainer = document.getElementById("qrcode-kasbon-page-container");
+
+  if (titleEl) titleEl.innerText = transData.type === "Kasbon" ? "QRIS Pinjaman Kasbon" : "QRIS Setoran Kasbon";
+  if (codeEl) codeEl.innerText = voucherCode || "-";
+  if (amtEl) amtEl.innerText = formatRupiah(transData.amount || 0);
+
+  if (qrContainer) {
+    qrContainer.innerHTML = "";
+    if (window.QRCode) {
+      state.qrCodeKasbonInstance = new QRCode(qrContainer, {
+        text: JSON.stringify({
+          app: "MYAIWA_KASBON",
+          code: voucherCode,
+          uid: transData.uid,
+          nama: transData.nama,
+          amount: transData.amount,
+          type: transData.type,
+          exp: expiresAtMillis
+        }),
+        width: 180,
+        height: 180,
+        colorDark: "#1a4b8b",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+  }
+
+  if (state.qrCountdownInterval) clearInterval(state.qrCountdownInterval);
+  if (activeQRISSnapshotUnsub) {
+    activeQRISSnapshotUnsub();
+    activeQRISSnapshotUnsub = null;
+  }
+
+  if (docId) {
+    activeQRISSnapshotUnsub = onSnapshot(doc(db, "employee_requests", docId), (dSnap) => {
+      if (dSnap.exists()) {
+        const d = dSnap.data();
+        if (d.status === "Approved") {
+          if (activeQRISSnapshotUnsub) activeQRISSnapshotUnsub();
+          if (state.qrCountdownInterval) clearInterval(state.qrCountdownInterval);
+          notify("Transaksi Berhasil", `Transaksi ${transData.type} sebesar ${formatRupiah(transData.amount)} telah disetujui GM.`);
+          navigateToTab("gaji");
+          loadKasbonAccountSummary();
+        } else if (d.status === "Rejected") {
+          if (activeQRISSnapshotUnsub) activeQRISSnapshotUnsub();
+          if (state.qrCountdownInterval) clearInterval(state.qrCountdownInterval);
+          notify("Pengajuan Ditolak", "Pengajuan kasbon Anda tidak disetujui.");
+          navigateToTab("gaji");
+          loadKasbonAccountSummary();
+        }
+      }
+    });
+  }
+
+  function updateTimer() {
+    const remaining = expiresAtMillis - Date.now();
+    if (remaining <= 0) {
+      clearInterval(state.qrCountdownInterval);
+      if (activeQRISSnapshotUnsub) activeQRISSnapshotUnsub();
+      if (timerEl) timerEl.innerText = "KODE TELAH KEDALUWARSA";
+      loadKasbonAccountSummary();
+      return;
+    }
+    const mins = Math.floor(remaining / (1000 * 60));
+    const secs = Math.floor((remaining % (1000 * 60)) / 1000);
+    if (timerEl) {
+      timerEl.innerText = `Berlaku: ${String(mins).padStart(2, '0')} Menit ${String(secs).padStart(2, '0')} Detik`;
+    }
+  }
+
+  updateTimer();
+  state.qrCountdownInterval = setInterval(updateTimer, 1000);
+
+  navigateToTab("qris-kasbon-page");
+}
+
+export function closeKasbonQRISModal() {
+  if (state.qrCountdownInterval) clearInterval(state.qrCountdownInterval);
+  if (activeQRISSnapshotUnsub) {
+    activeQRISSnapshotUnsub();
+    activeQRISSnapshotUnsub = null;
+  }
+  navigateToTab("gaji");
+}
+
+// ==========================================
+// 7. SCANNER GM FULL-PAGE & WAITING TRANSITION
 // ==========================================
 export function openGMScannerModal() {
-  const modal = document.getElementById("gm-scanner-modal");
-  modal?.classList.remove("hidden");
+  navigateToTab('gm-scanner-page');
+
+  const waitScreen = document.getElementById("scanner-waiting-screen");
+  const camBox = document.getElementById("scanner-camera-container");
+  if (waitScreen) waitScreen.classList.add("hidden");
+  if (camBox) camBox.classList.remove("hidden");
 
   if (window.Html5Qrcode) {
-    state.html5QrScanner = new Html5Qrcode("reader");
-    state.html5QrScanner.start(
-      { facingMode: "environment" },
-      { fps: 10, qrbox: { width: 220, height: 220 } },
-      (decodedText) => {
+    if (state.html5QrScanner) {
+      state.html5QrScanner.stop().catch(() => {}).finally(() => {
+        state.html5QrScanner = null;
+        startActiveCameraStream();
+      });
+    } else {
+      startActiveCameraStream();
+    }
+  }
+}
+
+function startActiveCameraStream() {
+  state.html5QrScanner = new Html5Qrcode("reader");
+  state.html5QrScanner.start(
+    { facingMode: "environment" },
+    { fps: 10, aspectRatio: 1.0, qrbox: { width: 220, height: 220 } },
+    (decodedText) => {
+      const waitScreen = document.getElementById("scanner-waiting-screen");
+      const camBox = document.getElementById("scanner-camera-container");
+      if (camBox) camBox.classList.add("hidden");
+      if (waitScreen) waitScreen.classList.remove("hidden");
+
+      if (state.html5QrScanner) {
+        state.html5QrScanner.stop().then(() => {
+          state.html5QrScanner = null;
+        }).catch(() => { state.html5QrScanner = null; });
+      }
+
+      setTimeout(() => {
         try {
           const payload = JSON.parse(decodedText);
           if (payload.code) {
-            closeGMScannerModal();
             validateScannedOperationalCode(payload.code);
           } else {
             notify("QR Tidak Dikenal", "Format QR Code tidak valid.");
+            closeGMScannerModal();
           }
         } catch (e) {
-          closeGMScannerModal();
           validateScannedOperationalCode(decodedText);
         }
-      },
-      () => {}
-    ).catch(() => {});
-  }
+      }, 700);
+    },
+    () => {}
+  ).catch((err) => {
+    console.warn("Gagal membuka kamera:", err);
+  });
 }
 
 export function closeGMScannerModal() {
@@ -692,18 +1053,32 @@ export function closeGMScannerModal() {
         state.html5QrScanner = null;
       });
   }
-  document.getElementById("gm-scanner-modal")?.classList.add("hidden");
+  navigateToTab('hr');
+  openHRSubPage('hr-requests');
 }
 
 export function validateManualVoucherCode() {
   const code = document.getElementById("input-manual-voucher-code")?.value.trim().toUpperCase();
-  if (!code) return notify("Perhatian", "Masukkan kode voucher.");
-  closeGMScannerModal();
-  validateScannedOperationalCode(code);
+  if (!code) return notify("Perhatian", "Masukkan kode voucher transaksi.");
+  
+  const waitScreen = document.getElementById("scanner-waiting-screen");
+  const camBox = document.getElementById("scanner-camera-container");
+  if (camBox) camBox.classList.add("hidden");
+  if (waitScreen) waitScreen.classList.remove("hidden");
+
+  if (state.html5QrScanner) {
+    state.html5QrScanner.stop().catch(() => {}).finally(() => {
+      state.html5QrScanner = null;
+    });
+  }
+
+  setTimeout(() => {
+    validateScannedOperationalCode(code);
+  }, 400);
 }
 
 export async function validateScannedOperationalCode(voucherCode) {
-  showLoading("Memvalidasi kode voucher...");
+  showLoading();
 
   try {
     const q = query(
@@ -714,6 +1089,7 @@ export async function validateScannedOperationalCode(voucherCode) {
 
     if (snap.empty) {
       hideLoading();
+      closeGMScannerModal();
       return notify("Kode Tidak Valid", `Tidak ditemukan pengajuan dengan kode ${voucherCode}.`);
     }
 
@@ -724,39 +1100,34 @@ export async function validateScannedOperationalCode(voucherCode) {
     if (reqData.expires_at_millis && now > reqData.expires_at_millis) {
       await setDoc(doc(db, "employee_requests", targetDoc.id), { status: "Expired", expired_at_millis: now }, { merge: true });
       hideLoading();
+      closeGMScannerModal();
       return notify("Kode Kedaluwarsa", "Batas waktu QRIS / Voucher telah habis.");
     }
 
     if (reqData.status === "Approved") {
       hideLoading();
+      closeGMScannerModal();
       return notify("Sudah Divalidasi", `Transaksi ${reqData.type} ${reqData.nama} sudah selesai.`);
     }
 
+    hideLoading();
     const confirmApprove = await showCustomConfirm(
       `Konfirmasi ${reqData.type}`,
-      `Validasi ${reqData.type} untuk ${reqData.nama} sejumlah Rp ${Number(reqData.amount).toLocaleString()}?`
+      `Validasi & Setujui ${reqData.type} untuk ${reqData.nama} sejumlah ${formatRupiah(reqData.amount)} (${reqData.termin_label || 'Termin 1'})?`
     );
 
     if (confirmApprove) {
-      await approveDisbursement(targetDoc.id, reqData.uid, reqData.month);
+      await approveDisbursement(targetDoc.id, reqData.uid, reqData.month, reqData.payroll_term);
+      notify("Transaksi Berhasil", `Transaksi ${reqData.type} untuk ${reqData.nama} berhasil disetujui.`);
+      closeGMScannerModal();
     } else {
-      hideLoading();
+      closeGMScannerModal();
     }
   } catch (err) {
     hideLoading();
+    closeGMScannerModal();
     notify("Gagal Validasi", err.message);
   }
-}
-
-// ==========================================
-// 7. EKSPOR SLIP GAJI
-// ==========================================
-export function openShareOptionsModal() {
-  document.getElementById("share-options-modal")?.classList.remove("hidden");
-}
-
-export function closeShareOptionsModal() {
-  document.getElementById("share-options-modal")?.classList.add("hidden");
 }
 
 export function printPayslip() {
@@ -765,15 +1136,17 @@ export function printPayslip() {
 
 export async function exportPayslipFile(formatType) {
   if (!state.currentPayslipCache) return notify("Perhatian", "Data slip tidak ditemukan.");
-  closeShareOptionsModal();
 
   const data = state.currentPayslipCache;
   const rawRole = String(data.role || 'staff').toLowerCase();
   const displayRole = (ROLE_DISPLAY_NAMES[rawRole] || rawRole).toUpperCase();
-  const docCode = `DOC-${data.month.replace("-", "")}-${data.uid.slice(0, 5).toUpperCase()}`;
-  const fileName = `SLIP_GAJI_${(data.nama || 'Karyawan').replace(/\s+/g, '_')}_${data.month}`;
+  const termSuffix = data.payroll_term === "termin_2" ? "T2" : "T1";
+  const docCode = `DOC-${(data.month || "2026-08").replace("-", "")}-${termSuffix}-${(data.uid || "USER").slice(0, 4).toUpperCase()}`;
+  const termLabel = data.termin_label || (data.payroll_term === "termin_2" ? "Termin 2 (Tanggal 15)" : "Termin 1 (Tanggal 1)");
+  const fileName = `SLIP_GAJI_${(data.nama || 'Karyawan').replace(/\s+/g, '_')}_${data.month}_${termSuffix}`;
+  const thpVal = data.takeHomePay !== undefined ? data.takeHomePay : (data.thp || 0);
 
-  showLoading(`Menyiapkan berkas ${formatType.toUpperCase()}...`);
+  showLoading();
 
   try {
     if (formatType === "doc") {
@@ -783,84 +1156,27 @@ export async function exportPayslipFile(formatType) {
           <meta charset='utf-8'>
           <title>Slip Gaji - ${data.nama}</title>
           <style>
-            body { font-family: 'Plus Jakarta Sans', Arial, sans-serif; font-size: 10pt; color: #0f172a; padding: 20px; }
+            body { font-family: Arial, sans-serif; font-size: 10pt; color: #0f172a; padding: 20px; }
             table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-            .header-table td { vertical-align: top; }
             .title { font-size: 14pt; font-weight: bold; color: #0f172a; }
-            .sub { font-size: 7.5pt; font-weight: bold; color: #64748b; margin-top: 2px; }
-            .badge { background-color: #dcfce7; color: #16a34a; padding: 3px 8px; font-size: 7.5pt; font-weight: bold; border-radius: 4px; }
-            .doc-id { font-size: 7.5pt; color: #94a3b8; margin-top: 4px; font-family: monospace; }
-            .divider { border-top: 2.5px solid #1A4B8B; margin: 10px 0; }
-            .meta-box { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; }
-            .meta-label { font-size: 7pt; color: #94a3b8; font-weight: bold; }
-            .meta-val { font-size: 9.5pt; color: #0f172a; font-weight: bold; }
-            .sec-title { font-size: 8pt; font-weight: bold; color: #64748b; padding-top: 12px; }
+            .divider { border-top: 2px solid #1A4B8B; margin: 10px 0; }
             .item-row td { padding: 5px 0; font-size: 9pt; }
             .item-deduct td { color: #ef4444; font-weight: 600; padding: 5px 0; font-size: 9pt; }
-            .total-box { background-color: #f1f5f9; border-radius: 8px; padding: 10px; }
-            .total-label { font-size: 9pt; font-weight: bold; color: #0f172a; }
             .total-amount { font-size: 13pt; font-weight: bold; color: #1A4B8B; text-align: right; }
-            .sig-table { margin-top: 30px; font-size: 8pt; color: #64748b; }
-            .sig-name { font-size: 9pt; font-weight: bold; color: #0f172a; border-top: 1.5px solid #0f172a; padding-top: 3px; display: inline-block; min-width: 150px; }
           </style>
         </head>
         <body>
-          <table class="header-table">
-            <tr>
-              <td>
-                <div class="title">AIWA RAGIN JAJE</div>
-                <div class="sub">PAYROLL DISBURSEMENT SYSTEM · CONFIDENTIAL</div>
-              </td>
-              <td align="right">
-                <span class="badge">TERVERIFIKASI SISTEM</span><br>
-                <div class="doc-id">${docCode}</div>
-              </td>
-            </tr>
-          </table>
-
+          <div class="title">AIWA RAGIN JAJE</div>
+          <div style="font-size:8pt; color:#64748b;">PAYROLL DISBURSEMENT SYSTEM · ${docCode}</div>
           <div class="divider"></div>
-
-          <div class="meta-box">
-            <table>
-              <tr>
-                <td width="50%"><span class="meta-label">NAMA STAF</span><br><span class="meta-val">${data.nama}</span></td>
-                <td width="50%"><span class="meta-label">JABATAN / ROLE</span><br><span class="meta-val">${displayRole}</span></td>
-              </tr>
-              <tr>
-                <td style="padding-top:6px;"><span class="meta-label">PERIODE GAJI</span><br><span class="meta-val">${data.month}</span></td>
-                <td style="padding-top:6px;"><span class="meta-label">REKENING PENERIMA</span><br><span class="meta-val">${data.bank || '-'}</span></td>
-              </tr>
-            </table>
-          </div>
-
-          <div class="sec-title">RINCIAN PENGHASILAN (INCOME)</div>
+          <p><b>Nama:</b> ${data.nama} | <b>Jabatan:</b> ${displayRole} | <b>Periode:</b> ${data.month} (${termLabel})</p>
           <table>
-            <tr class="item-row"><td>Gaji Pokok</td><td align="right"><b>Rp ${(data.baseSalary || 0).toLocaleString()}</b></td></tr>
-            <tr class="item-row"><td>Tunjangan Jabatan</td><td align="right"><b>Rp ${(data.roleAllowance || 0).toLocaleString()}</b></td></tr>
-            <tr class="item-row"><td>Uang Makan (${data.hadir || 0} Hari)</td><td align="right"><b>Rp ${(data.mealTotal || 0).toLocaleString()}</b></td></tr>
-            ${(data.overtimePay > 0) ? `<tr class="item-row" style="color:#1A4B8B;"><td>Upah Lembur (${data.lemburJam || 0} Jam)</td><td align="right"><b>+ Rp ${data.overtimePay.toLocaleString()}</b></td></tr>` : ''}
-          </table>
-
-          <div class="sec-title">POTONGAN (DEDUCTION)</div>
-          <table>
-            <tr class="item-deduct"><td>Denda Keterlambatan (${data.telat || 0}x)</td><td align="right">- Rp ${(data.latePenaltyTotal || 0).toLocaleString()}</td></tr>
-            <tr class="item-deduct"><td>Pinjaman Kasbon</td><td align="right">- Rp ${(data.kasbon || 0).toLocaleString()}</td></tr>
-          </table>
-
-          <div class="total-box" style="margin-top:14px;">
-            <table>
-              <tr>
-                <td class="total-label">GAJI BERSIH (TAKE HOME PAY)</td>
-                <td class="total-amount">Rp ${(data.takeHomePay || 0).toLocaleString()}</td>
-              </tr>
-            </table>
-          </div>
-
-          <table class="sig-table">
-            <tr>
-              <td width="50%">Diterbitkan Resmi,<br><br><br><br><span class="sig-name">Finance & HR Management</span></td>
-              <td width="50%" align="right">Penerima Manfaat,<br><br><br><br><span class="sig-name" style="text-align:right;">${data.nama}</span></td>
-            </tr>
+            <tr class="item-row"><td>Gaji Pokok</td><td align="right"><b>${formatRupiah(data.baseSalary || 0)}</b></td></tr>
+            <tr class="item-row"><td>Tunjangan Jabatan</td><td align="right"><b>${formatRupiah(data.roleAllowance || 0)}</b></td></tr>
+            <tr class="item-row"><td>Uang Makan (${data.hadir || 0} Hari)</td><td align="right"><b>${formatRupiah(data.mealTotal || 0)}</b></td></tr>
+            <tr class="item-deduct"><td>Denda Keterlambatan (${data.telat || 0}x)</td><td align="right">- ${formatRupiah(data.latePenaltyTotal || 0)}</td></tr>
+            <tr class="item-deduct"><td>Pinjaman Kasbon</td><td align="right">- ${formatRupiah(data.kasbon || 0)}</td></tr>
+            <tr><td style="padding-top:10px; font-weight:bold;">GAJI BERSIH (THP)</td><td class="total-amount">${formatRupiah(thpVal)}</td></tr>
           </table>
         </body>
         </html>
@@ -886,155 +1202,59 @@ export async function exportPayslipFile(formatType) {
 
       docPdf.setFont("helvetica", "bold");
       docPdf.setFontSize(14);
-      docPdf.setTextColor(15, 23, 42);
       docPdf.text("AIWA RAGIN JAJE", 45, 52);
 
-      docPdf.setFont("helvetica", "bold");
-      docPdf.setFontSize(7.5);
-      docPdf.setTextColor(100, 116, 139);
-      docPdf.text("PAYROLL DISBURSEMENT SYSTEM · CONFIDENTIAL", 45, 65);
-
-      docPdf.setFillColor(220, 252, 231);
-      docPdf.roundedRect(425, 40, 125, 16, 3, 3, "F");
-      docPdf.setFontSize(7.5);
-      docPdf.setTextColor(22, 163, 74);
-      docPdf.text("TERVERIFIKASI SISTEM", 436, 51);
-
-      docPdf.setFont("courier", "normal");
       docPdf.setFontSize(8);
-      docPdf.setTextColor(148, 163, 184);
-      docPdf.text(docCode, 550, 66, { align: "right" });
+      docPdf.setTextColor(100, 116, 139);
+      docPdf.text(`PAYROLL DISBURSEMENT · ${docCode}`, 45, 66);
 
       docPdf.setDrawColor(26, 75, 139);
-      docPdf.setLineWidth(2.5);
+      docPdf.setLineWidth(2);
       docPdf.line(45, 78, 550, 78);
 
-      docPdf.setFillColor(248, 250, 252);
-      docPdf.setDrawColor(241, 245, 249);
-      docPdf.roundedRect(45, 92, 505, 54, 8, 8, "FD");
-
-      docPdf.setFont("helvetica", "bold");
-      docPdf.setFontSize(7);
-      docPdf.setTextColor(148, 163, 184);
-      docPdf.text("NAMA STAF", 58, 108);
-      docPdf.text("JABATAN / ROLE", 300, 108);
-
       docPdf.setFontSize(9);
       docPdf.setTextColor(15, 23, 42);
-      docPdf.text(data.nama, 58, 120);
-      docPdf.text(displayRole, 300, 120);
+      docPdf.text(`Nama: ${data.nama} | Role: ${displayRole} | Periode: ${data.month} (${termLabel})`, 45, 100);
 
-      docPdf.setFontSize(7);
-      docPdf.setTextColor(148, 163, 184);
-      docPdf.text("PERIODE GAJI", 58, 133);
-      docPdf.text("REKENING PENERIMA", 300, 133);
-
-      docPdf.setFontSize(9);
-      docPdf.setTextColor(15, 23, 42);
-      docPdf.text(data.month, 58, 143);
-      docPdf.text(data.bank || "-", 300, 143);
-
-      let y = 172;
-      docPdf.setFont("helvetica", "bold");
-      docPdf.setFontSize(8);
-      docPdf.setTextColor(100, 116, 139);
-      docPdf.text("RINCIAN PENGHASILAN (INCOME)", 45, y);
-
-      y += 16;
-      docPdf.setFont("helvetica", "normal");
-      docPdf.setFontSize(9);
-      docPdf.setTextColor(15, 23, 42);
-
+      let y = 130;
       const incomeList = [
-        ["Gaji Pokok", `Rp ${(data.baseSalary || 0).toLocaleString()}`],
-        ["Tunjangan Jabatan", `Rp ${(data.roleAllowance || 0).toLocaleString()}`],
-        [`Uang Makan (${data.hadir || 0} Hari)`, `Rp ${(data.mealTotal || 0).toLocaleString()}`]
+        ["Gaji Pokok", formatRupiah(data.baseSalary || 0)],
+        ["Tunjangan Jabatan", formatRupiah(data.roleAllowance || 0)],
+        [`Uang Makan (${data.hadir || 0} Hari)`, formatRupiah(data.mealTotal || 0)],
+        [`Denda Keterlambatan (${data.telat || 0}x)`, `- ${formatRupiah(data.latePenaltyTotal || 0)}`],
+        ["Pinjaman Kasbon", `- ${formatRupiah(data.kasbon || 0)}`]
       ];
-      if (data.overtimePay > 0) incomeList.push([`Upah Lembur (${data.lemburJam || 0} Jam)`, `+ Rp ${data.overtimePay.toLocaleString()}`]);
 
       incomeList.forEach(item => {
         docPdf.text(item[0], 48, y);
-        docPdf.setFont("helvetica", "bold");
         docPdf.text(item[1], 548, y, { align: "right" });
-        docPdf.setFont("helvetica", "normal");
-        y += 16;
+        y += 18;
       });
 
-      y += 6;
+      y += 15;
       docPdf.setFont("helvetica", "bold");
-      docPdf.setFontSize(8);
-      docPdf.setTextColor(100, 116, 139);
-      docPdf.text("POTONGAN (DEDUCTION)", 45, y);
-
-      y += 16;
-      docPdf.setFont("helvetica", "normal");
-      docPdf.setFontSize(9);
-      docPdf.setTextColor(239, 68, 68);
-
-      const deductList = [
-        [`Denda Keterlambatan (${data.telat || 0}x)`, `- Rp ${(data.latePenaltyTotal || 0).toLocaleString()}`],
-        ["Pinjaman Kasbon", `- Rp ${(data.kasbon || 0).toLocaleString()}`]
-      ];
-
-      deductList.forEach(item => {
-        docPdf.text(item[0], 48, y);
-        docPdf.setFont("helvetica", "bold");
-        docPdf.text(item[1], 548, y, { align: "right" });
-        docPdf.setFont("helvetica", "normal");
-        y += 16;
-      });
-
-      y += 10;
-      docPdf.setFillColor(241, 245, 249);
-      docPdf.roundedRect(45, y, 505, 34, 6, 6, "F");
-
-      docPdf.setFont("helvetica", "bold");
-      docPdf.setFontSize(9);
-      docPdf.setTextColor(15, 23, 42);
-      docPdf.text("GAJI BERSIH (TAKE HOME PAY)", 58, y + 21);
-
-      docPdf.setFontSize(12);
-      docPdf.setTextColor(26, 75, 139);
-      docPdf.text(`Rp ${(data.takeHomePay || 0).toLocaleString()}`, 540, y + 22, { align: "right" });
-
-      y += 68;
-      docPdf.setFont("helvetica", "normal");
-      docPdf.setFontSize(8);
-      docPdf.setTextColor(100, 116, 139);
-      docPdf.text("Diterbitkan Resmi,", 48, y);
-      docPdf.text("Penerima Manfaat,", 400, y);
-
-      y += 35;
-      docPdf.setDrawColor(15, 23, 42);
-      docPdf.setLineWidth(1.2);
-      docPdf.line(48, y, 190, y);
-      docPdf.line(400, y, 545, y);
-
-      docPdf.setFont("helvetica", "bold");
-      docPdf.setFontSize(8.5);
-      docPdf.setTextColor(15, 23, 42);
-      docPdf.text("Finance & HR Management", 48, y + 10);
-      docPdf.text(data.nama, 400, y + 10);
+      docPdf.text("GAJI BERSIH (TAKE HOME PAY)", 48, y);
+      docPdf.text(formatRupiah(thpVal), 548, y, { align: "right" });
 
       docPdf.save(`${fileName}.pdf`);
       hideLoading();
       notify("Sukses", "Slip gaji berhasil diunduh sebagai PDF.");
     }
     else if (formatType === "image") {
-      const element = document.getElementById("printable-payslip");
-      if (!window.html2canvas) throw new Error("Library HTML2Canvas belum siap.");
+      if (!window.html2canvas) throw new Error("Library html2canvas belum dimuat.");
+      const slipEl = document.getElementById("printable-payslip-area");
+      if (!slipEl) throw new Error("Elemen slip tidak ditemukan.");
 
-      const canvas = await html2canvas(element, {
+      const canvas = await html2canvas(slipEl, {
         scale: 2,
-        backgroundColor: "#ffffff",
-        logging: false,
-        useCORS: true
+        useCORS: true,
+        backgroundColor: "#ffffff"
       });
 
-      const imgData = canvas.toDataURL("image/png");
+      const imgUrl = canvas.toDataURL("image/png");
       const a = document.createElement("a");
+      a.href = imgUrl;
       a.download = `${fileName}.png`;
-      a.href = imgData;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -1049,206 +1269,14 @@ export async function exportPayslipFile(formatType) {
 }
 
 // ==========================================
-// 8. MODUL KASBON & COUNTDOWN QRIS 1 JAM
-// ==========================================
-export function openKasbonForm(actionType) {
-  const formBox = document.getElementById("box-form-kasbon");
-  const titleEl = document.getElementById("kasbon-form-title");
-  const labelEl = document.getElementById("kasbon-input-label");
-  const typeInput = document.getElementById("kasbon-action-type");
-  const cicilanBox = document.getElementById("box-cicilan-fields");
-
-  if (!formBox) return;
-
-  if (actionType === "pinjam") {
-    const currentKPIStatus = document.getElementById("kpi-status-tag")?.innerText?.trim().toLowerCase() || "kurang";
-    const currentKPIScore = document.getElementById("kpi-score-badge")?.innerText?.trim() || "0%";
-
-    if (currentKPIStatus !== "memuaskan") {
-      return notify(
-        "Akses Kasbon Terkunci",
-        `Pengajuan kasbon hanya dapat diakses oleh karyawan dengan performa KPI MEMUASKAN (>85%).\n\nStatus KPI Anda saat ini: ${currentKPIStatus.toUpperCase()} (${currentKPIScore}). Tingkatkan kehadiran dan kepatuhan tugas harian Anda untuk membuka hak fasilitas kasbon.`
-      );
-    }
-
-    titleEl.innerText = "Formulir Pengajuan Pinjaman Kasbon";
-    labelEl.innerText = "TOTAL NOMINAL PINJAMAN (RP)";
-    if (cicilanBox) cicilanBox.classList.remove("hidden");
-  } else {
-    titleEl.innerText = "Formulir Pembayaran / Setoran Kasbon";
-    labelEl.innerText = "NOMINAL YANG DIBAYARKAN (RP)";
-    if (cicilanBox) cicilanBox.classList.add("hidden");
-  }
-
-  typeInput.value = actionType;
-  document.getElementById("kasbon-amount-input").value = "";
-  document.getElementById("kasbon-notes-input").value = "";
-  formBox.classList.remove("hidden");
-}
-
-export async function loadKasbonAccountSummary() {
-  const user = auth.currentUser;
-  if (!user) return;
-
-  const displaySisa = document.getElementById("display-sisa-kasbon");
-  const displayPinjaman = document.getElementById("display-total-pinjaman");
-  const displayPelunasan = document.getElementById("display-total-pelunasan");
-  const historyList = document.getElementById("kasbon-history-list");
-
-  try {
-    const snap = await getDocs(query(
-      collection(db, "employee_requests"),
-      where("uid", "==", user.uid)
-    ));
-
-    let totalPinjaman = 0;
-    let totalPelunasan = 0;
-    let transactions = [];
-    const now = Date.now();
-
-    for (const docSnap of snap.docs) {
-      const item = { id: docSnap.id, ...docSnap.data() };
-      if (item.type === "Kasbon" || item.type === "Bayar Kasbon") {
-        
-        if (item.status === "Pending" && item.expires_at_millis && now > item.expires_at_millis) {
-          item.status = "Expired";
-          item.expired_at_millis = item.expires_at_millis;
-          setDoc(doc(db, "employee_requests", item.id), { status: "Expired", expired_at_millis: now }, { merge: true }).catch(() => {});
-        }
-
-        if (item.status === "Expired" && item.expired_at_millis && (now - item.expired_at_millis > 60 * 1000)) {
-          deleteDoc(doc(db, "employee_requests", item.id)).catch(() => {});
-          continue;
-        }
-
-        transactions.push(item);
-
-        if (item.type === "Kasbon" && item.status === "Approved") {
-          totalPinjaman += Number(item.amount || 0);
-          totalPelunasan += Number(item.total_paid || 0);
-        } else if (item.type === "Bayar Kasbon" && item.status === "Approved") {
-          totalPelunasan += Number(item.amount || 0);
-        } else if (item.type === "Kasbon" && item.status === "Settled") {
-          totalPinjaman += Number(item.amount || 0);
-          totalPelunasan += Number(item.amount || 0);
-        }
-      }
-    }
-
-    const sisaKasbon = Math.max(0, totalPinjaman - totalPelunasan);
-
-    if (displaySisa) displaySisa.innerText = `Rp ${sisaKasbon.toLocaleString()}`;
-    if (displayPinjaman) displayPinjaman.innerText = `Rp ${totalPinjaman.toLocaleString()}`;
-    if (displayPelunasan) displayPelunasan.innerText = `Rp ${totalPelunasan.toLocaleString()}`;
-
-    if (!historyList) return;
-    if (transactions.length === 0) {
-      historyList.innerHTML = "<p class='placeholder-text'>Belum ada transaksi kasbon.</p>";
-      return;
-    }
-
-    transactions.sort((a, b) => (b.requested_millis || 0) - (a.requested_millis || 0));
-
-    historyList.innerHTML = transactions.map(t => {
-      const isPinjam = t.type === "Kasbon";
-      const color = isPinjam ? "#ff9500" : "#34c759";
-      const prefix = isPinjam ? "+ Rp " : "- Rp ";
-      const cicilanMeta = isPinjam ? `<small style="display:block; font-size:0.52rem; color:var(--text-accent);">Cicilan: Rp ${Number(t.monthly_installment || t.amount).toLocaleString()} / bln (${t.tenor_months || 1} Bln)</small>` : '';
-
-      let statusDisplayColor = "#ff9500";
-      if (t.status === "Approved") statusDisplayColor = "#34c759";
-      if (t.status === "Expired" || t.status === "Rejected") statusDisplayColor = "#ff3b30";
-
-      const showQRISBtn = (t.status === "Pending" && t.voucher_code) 
-        ? `<button type="button" class="btn-primary" style="padding:4px 8px; font-size:0.58rem; margin-top:4px;" onclick="showKasbonQRISModal('${t.voucher_code}', ${t.expires_at_millis}, ${JSON.stringify(t).replace(/"/g, '&quot;')})">Tampilkan QRIS</button>` 
-        : '';
-
-      return `
-        <div style="padding: 10px 0; border-bottom: 0.5px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-          <div style="text-align:left;">
-            <strong style="font-size: 0.72rem; color: var(--text-primary);">${t.type}</strong>
-            <small style="display: block; font-size: 0.58rem; color: var(--text-secondary);">${t.note || '-'}</small>
-            ${cicilanMeta}
-            <small style="font-size: 0.55rem; color: ${statusDisplayColor}; font-weight: 700; display:block; margin-top:2px;">Status: ${t.status.toUpperCase()}</small>
-            ${showQRISBtn}
-          </div>
-          <strong style="font-size: 0.82rem; color: ${color};">${prefix}${Number(t.amount || 0).toLocaleString()}</strong>
-        </div>
-      `;
-    }).join("");
-
-  } catch (err) {
-    console.warn("Gagal load kasbon:", err);
-  }
-}
-
-export function showKasbonQRISModal(voucherCode, expiresAtMillis, transData) {
-  const modal = document.getElementById("qris-kasbon-modal");
-  const codeEl = document.getElementById("kasbon-voucher-code-display");
-  const qrContainer = document.getElementById("qrcode-kasbon-container");
-  const timerEl = document.getElementById("kasbon-countdown-timer");
-
-  if (codeEl) codeEl.innerText = voucherCode;
-
-  if (qrContainer) {
-    qrContainer.innerHTML = "";
-    if (window.QRCode) {
-      state.qrCodeKasbonInstance = new QRCode(qrContainer, {
-        text: JSON.stringify({
-          app: "MYAIWA_KASBON",
-          code: voucherCode,
-          uid: transData.uid,
-          nama: transData.nama,
-          amount: transData.amount,
-          type: transData.type,
-          exp: expiresAtMillis
-        }),
-        width: 160,
-        height: 160,
-        colorDark: "#ff9500",
-        colorLight: "#ffffff",
-        correctLevel: QRCode.CorrectLevel.M
-      });
-    }
-  }
-
-  if (state.qrCountdownInterval) clearInterval(state.qrCountdownInterval);
-
-  function updateTimer() {
-    const remaining = expiresAtMillis - Date.now();
-    if (remaining <= 0) {
-      clearInterval(state.qrCountdownInterval);
-      if (timerEl) timerEl.innerText = "KODE TELAH KEDALUWARSA (EXPIRED)";
-      loadKasbonAccountSummary();
-      return;
-    }
-    const mins = Math.floor(remaining / (1000 * 60));
-    const secs = Math.floor((remaining % (1000 * 60)) / 1000);
-    if (timerEl) {
-      timerEl.innerText = `Berlaku: ${String(mins).padStart(2, '0')} Menit ${String(secs).padStart(2, '0')} Detik`;
-    }
-  }
-
-  updateTimer();
-  state.qrCountdownInterval = setInterval(updateTimer, 1000);
-
-  modal?.classList.remove("hidden");
-}
-
-export function closeKasbonQRISModal() {
-  if (state.qrCountdownInterval) clearInterval(state.qrCountdownInterval);
-  document.getElementById("qris-kasbon-modal")?.classList.add("hidden");
-}
-
-// ==========================================
-// 9. WORKFLOW PERSETUJUAN
+// 8. WORKFLOW PENGAJUAN & VALIDASI GM
 // ==========================================
 export async function loadHRRequestsList() {
   const listEl = document.getElementById("hr-requests-list");
   if (!listEl) return;
 
   try {
-    const snap = await getDocs(query(collection(db, "employee_requests"), limit(40)));
+    const snap = await getDocs(query(collection(db, "employee_requests"), limit(50)));
     listEl.innerHTML = "";
     if (snap.empty) {
       listEl.innerHTML = "<p class='placeholder-text'>Belum ada pengajuan staf.</p>";
@@ -1256,76 +1284,155 @@ export async function loadHRRequestsList() {
     }
 
     const now = Date.now();
-    const oneDayAgo = now - (24 * 60 * 60 * 1000);
+    let requests = [];
 
     for (const d of snap.docs) {
-      const item = d.data();
-      const docId = d.id;
+      const item = { id: d.id, ...d.data() };
 
-      const reqTime = item.requested_millis || (item.requested_at?.toDate ? item.requested_at.toDate().getTime() : 0);
+      if (item.status === "Pending" && item.expires_at_millis && now > item.expires_at_millis) {
+        item.status = "Expired";
+        setDoc(doc(db, "employee_requests", d.id), { status: "Expired", expired_at_millis: now }, { merge: true }).catch(() => {});
+      }
 
-      if ((item.status === "Approved" || item.status === "Expired") && reqTime > 0 && reqTime < oneDayAgo) {
-        deleteDoc(doc(db, "employee_requests", docId)).catch(() => {});
+      if (item.status === "Rejected") {
+        const deleteAt = (item.rejected_at_millis || item.requested_millis || now) + 60000;
+        if (now >= deleteAt) {
+          deleteDoc(doc(db, "employee_requests", d.id)).catch(() => {});
+          continue;
+        }
+      }
+
+      const isLunas = item.type === "Kasbon" && item.status === "Approved" && (((Number(item.amount) || 0) - (Number(item.total_paid) || 0)) <= 0);
+      if (item.status === "Settled" || isLunas) {
+        deleteDoc(doc(db, "employee_requests", d.id)).catch(() => {});
         continue;
       }
 
-      let currentItemStatus = item.status;
-      if (item.status === "Pending" && item.expires_at_millis && now > item.expires_at_millis) {
-        currentItemStatus = "Expired";
-        setDoc(doc(db, "employee_requests", docId), { status: "Expired", expired_at_millis: now }, { merge: true }).catch(() => {});
+      requests.push(item);
+    }
+
+    if (requests.length === 0) {
+      listEl.innerHTML = "<p class='placeholder-text'>Tidak ada antrean pengajuan aktif.</p>";
+      return;
+    }
+
+    requests.sort((a, b) => (b.requested_millis || 0) - (a.requested_millis || 0));
+
+    listEl.innerHTML = requests.map(item => {
+      const isPending = item.status === "Pending";
+      const isApproved = item.status === "Approved";
+      const isRejected = item.status === "Rejected";
+      const isSalaryClaim = item.type === "Tarik Gaji";
+      const formattedTime = formatShortDateTime(item.requested_millis || item.timestamp?.toMillis?.());
+
+      let statusColor = "#f59e0b";
+      let statusLabel = item.status;
+
+      if (isApproved) {
+        statusColor = "#10b981";
+      } else if (isRejected) {
+        statusColor = "#ef4444";
+        const deleteAt = (item.rejected_at_millis || item.requested_millis || Date.now()) + 60000;
+        const remainSec = Math.max(0, Math.ceil((deleteAt - Date.now()) / 1000));
+        statusLabel = `Rejected (${remainSec}s)`;
+      } else if (item.status === "Expired") {
+        statusColor = "#ef4444";
       }
 
-      const div = document.createElement("div");
-      div.className = "request-item-row";
+      const clickHandler = isApproved && item.type === "Kasbon"
+        ? `onclick="openKasbonPaymentDetailModal(${JSON.stringify(item).replace(/"/g, '&quot;')})"`
+        : '';
 
-      const isPending = currentItemStatus === "Pending";
-      const isSalaryClaim = item.type === "Tarik Gaji";
+      const approvedHint = isApproved && item.type === "Kasbon" 
+        ? `<small style="color:var(--text-accent); font-weight:700; margin-top:2px;">• Ketuk untuk rincian pembayaran</small>` 
+        : '';
 
-      let statusColor = "#ff9500";
-      if (currentItemStatus === "Approved") statusColor = "#34c759";
-      if (currentItemStatus === "Rejected" || currentItemStatus === "Expired") statusColor = "#ff3b30";
-
-      div.innerHTML = `
-        <div class="request-item-info">
-          <strong>${item.nama} [${item.type}]</strong>
-          <small class="text-muted-xs">${isSalaryClaim ? 'Take Home Pay: Rp ' + Number(item.amount).toLocaleString() : 'Rp ' + Number(item.amount || 0).toLocaleString()} · ${item.note}</small>
-          <small class="mt-1">Status: <b style="color:${statusColor}">${currentItemStatus}</b></small>
-        </div>
-        <div class="request-action-group">
-          ${isPending ? `
-            <button type="button" class="btn-approve-action" onclick="approveDisbursement('${docId}', '${item.uid}', '${item.month || ''}')">
-              ${isSalaryClaim ? 'Cairkan' : 'Setujui'}
-            </button>
-            <button type="button" class="btn-reject-action" onclick="updateRequestStatus('${docId}', 'Rejected')">
-              Tolak
-            </button>
-          ` : `<span class="badge-completed" style="background:${statusColor}22; color:${statusColor};">${currentItemStatus}</span>`}
+      return `
+        <div class="request-item-row" style="cursor:${isApproved && item.type === 'Kasbon' ? 'pointer' : 'default'};" ${clickHandler}>
+          <div class="request-item-info">
+            <strong>${item.nama} [${item.type}]</strong>
+            <small class="text-muted-xs">${formatRupiah(item.amount || 0)} · ${item.note || ''}</small>
+            <small class="mt-1">Waktu: <b style="color:var(--text-primary);">${formattedTime}</b></small>
+            <small>Status: <b style="color:${statusColor}">${statusLabel}</b></small>
+            ${approvedHint}
+          </div>
+          <div class="request-action-group">
+            ${isPending ? `
+              <button type="button" class="btn-approve-action" onclick="approveDisbursement('${item.id}', '${item.uid}', '${item.month || ''}', '${item.payroll_term || ''}')">
+                ${isSalaryClaim ? 'Cairkan' : 'Setujui'}
+              </button>
+              <button type="button" class="btn-reject-action" onclick="updateRequestStatus('${item.id}', 'Rejected')">
+                Tolak
+              </button>
+            ` : `<span class="badge-completed" style="background:${statusColor}22; color:${statusColor};">${statusLabel}</span>`}
+          </div>
         </div>
       `;
-      listEl.appendChild(div);
+    }).join("");
+
+    if (hrRequestsCountdownTimer) clearInterval(hrRequestsCountdownTimer);
+    if (requests.some(r => r.status === "Rejected")) {
+      hrRequestsCountdownTimer = setInterval(() => {
+        loadHRRequestsList();
+      }, 1000);
     }
+
   } catch (e) {
-    listEl.innerHTML = `<p class='placeholder-text' style='color:#ff3b30;'>Gagal memuat pengajuan: ${e.message}</p>`;
+    listEl.innerHTML = `<p class='placeholder-text' style='color:#ef4444;'>Gagal memuat pengajuan: ${e.message}</p>`;
   }
 }
 
-export async function approveDisbursement(requestId, userId, monthStr) {
-  showLoading("Memvalidasi pengajuan...");
+export async function approveDisbursement(requestId, userId, monthStr, payrollTerm = "termin_1") {
+  showLoading();
   try {
+    const targetDocSnap = await getDoc(doc(db, "employee_requests", requestId));
+    const reqData = targetDocSnap.exists() ? targetDocSnap.data() : {};
+
     await setDoc(doc(db, "employee_requests", requestId), { 
       status: "Approved",
       disbursement_status: "Paid",
-      approved_at: serverTimestamp() 
+      approved_at: serverTimestamp(),
+      approved_millis: Date.now()
     }, { merge: true });
 
     if (userId && monthStr) {
-      await setDoc(doc(db, "salary_slips_archive", `${userId}_${monthStr}`), {
-        disbursement_status: "Paid"
-      }, { merge: true });
+      const termKey = payrollTerm || "termin_1";
+      await Promise.all([
+        setDoc(doc(db, "salary_slips_archive", `${userId}_${monthStr}_${termKey}`), { disbursement_status: "Paid" }, { merge: true }),
+        setDoc(doc(db, "salary_slips_archive", `${userId}_${monthStr}`), { disbursement_status: "Paid" }, { merge: true })
+      ]);
+    }
+
+    if (reqData.type === "Bayar Kasbon" && reqData.uid) {
+      const userReqSnap = await getDocs(query(
+        collection(db, "employee_requests"),
+        where("uid", "==", reqData.uid)
+      ));
+
+      let userBorrowed = 0;
+      let userRepaid = 0;
+      let activeLoanDocs = [];
+
+      userReqSnap.forEach(d => {
+        const item = d.data();
+        if (item.type === "Kasbon" && (item.status === "Approved" || item.status === "Settled" || d.id === requestId)) {
+          userBorrowed += Number(item.amount || 0);
+          activeLoanDocs.push(d.id);
+        } else if (item.type === "Bayar Kasbon" && (item.status === "Approved" || item.status === "Settled" || d.id === requestId)) {
+          userRepaid += Number(item.amount || 0);
+          activeLoanDocs.push(d.id);
+        }
+      });
+
+      if (userBorrowed > 0 && (userBorrowed - userRepaid) <= 0) {
+        const delBatch = writeBatch(db);
+        activeLoanDocs.forEach(id => delBatch.delete(doc(db, "employee_requests", id)));
+        await delBatch.commit();
+      }
     }
 
     hideLoading();
-    notify("Sukses", "Pengajuan berhasil disetujui / divalidasi.");
+    notify("Sukses", "Pengajuan berhasil disetujui.");
     loadHRRequestsList();
     loadKasbonAccountSummary();
   } catch (err) {
@@ -1335,9 +1442,18 @@ export async function approveDisbursement(requestId, userId, monthStr) {
 }
 
 export async function updateRequestStatus(docId, newStatus) {
-  showLoading(`Mengubah status pengajuan...`);
+  showLoading();
   try {
-    await setDoc(doc(db, "employee_requests", docId), { status: newStatus }, { merge: true });
+    let payload = { 
+      status: newStatus,
+      updated_at: serverTimestamp() 
+    };
+
+    if (newStatus === "Rejected") {
+      payload.rejected_at_millis = Date.now();
+    }
+
+    await setDoc(doc(db, "employee_requests", docId), payload, { merge: true });
     hideLoading();
     notify("Sukses", `Pengajuan berhasil di-${newStatus}.`);
     loadHRRequestsList();
@@ -1346,4 +1462,39 @@ export async function updateRequestStatus(docId, newStatus) {
     hideLoading();
     notify("Gagal", e.message); 
   }
+}
+
+// ==========================================
+// 9. LAMAN PENUH DETAIL RIWAYAT PEMBAYARAN KASBON
+// ==========================================
+export function openKasbonPaymentDetailModal(data) {
+  if (!data) return;
+
+  const totalAmount = Number(data.amount || 0);
+  const totalPaid = Number(data.total_paid || 0);
+  const remaining = Math.max(0, totalAmount - totalPaid);
+  const tenor = Number(data.tenor_months || 1);
+  const installment = Number(data.monthly_installment || Math.ceil(totalAmount / tenor));
+  const paidCount = Number(data.installment_paid_count || 0);
+  const formattedTime = formatShortDateTime(data.requested_millis || data.timestamp?.toMillis?.());
+
+  const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
+
+  setTxt("page-kasbon-employee-name", `Kasbon: ${data.nama || 'Karyawan'}`);
+  setTxt("page-kasbon-code", `KODE: ${data.voucher_code || '-'}`);
+  setTxt("page-kasbon-total-amount", formatRupiah(totalAmount));
+  setTxt("page-kasbon-timestamp", `Tanggal Pengajuan: ${formattedTime}`);
+  setTxt("page-kasbon-paid", formatRupiah(totalPaid));
+  setTxt("page-kasbon-remaining", formatRupiah(remaining));
+  setTxt("page-kasbon-tenor", `Tenor: ${tenor} Bulan`);
+  setTxt("page-kasbon-installment", `${formatRupiah(installment)} / bln`);
+  setTxt("page-kasbon-installment-progress", `Progres: ${paidCount} / ${tenor} Kali Angsuran`);
+  setTxt("page-kasbon-note", `"${data.note || 'Keperluan operasional'}"`);
+
+  navigateToTab('kasbon-detail-page');
+}
+
+export function closeKasbonPaymentDetailModal() {
+  navigateToTab('hr');
+  openHRSubPage('hr-requests');
 }

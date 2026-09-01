@@ -1,5 +1,5 @@
 <!-- ==========================================================================
-     VIEWS/MODALS.HTML - SEMUA DIALOG, SCANNER & POPUP MODAL
+     VIEWS/MODALS.HTML - SEMUA DIALOG & POPUP MODAL
      ========================================================================== -->
 
 <!-- 1. MODAL FORMAT SHARE & EKSPOR SLIP -->
@@ -40,29 +40,7 @@
   </div>
 </div>
 
-<!-- 2. MODAL GM SCANNER QR -->
-<div id="gm-scanner-modal" class="modal-overlay hidden">
-  <div class="modal-card">
-    <div class="modal-dialog-header">
-      <h3>SCAN KODE QR OPERASIONAL</h3>
-      <span class="instruction-note">VALIDASI GAJI & KASBON OLEH GM</span>
-    </div>
-
-    <div id="reader" class="leaflet-map-box mt-2 mb-2"></div>
-
-    <div class="form-group mb-1">
-      <label>Atau Input Kode Voucher Manual</label>
-      <input type="text" id="input-manual-voucher-code" placeholder="Contoh: KASBON-202608-4345">
-    </div>
-
-    <div class="grid-2 gap-sm mt-2">
-      <button type="button" class="btn-primary" onclick="validateManualVoucherCode()">Validasi</button>
-      <button type="button" class="btn-secondary-line" onclick="closeGMScannerModal()">Batal</button>
-    </div>
-  </div>
-</div>
-
-<!-- 3. MODAL QR PENARIKAN GAJI TUNAI (1x24 JAM) -->
+<!-- 2. MODAL QR PENARIKAN GAJI TUNAI (1x24 JAM) -->
 <div id="qr-receipt-modal" class="modal-overlay hidden">
   <div class="modal-card">
     <div class="modal-dialog-header">
@@ -87,32 +65,7 @@
   </div>
 </div>
 
-<!-- 4. MODAL QRIS TRANSAKSI KASBON (COUNTDOWN 1 JAM) -->
-<div id="qris-kasbon-modal" class="modal-overlay hidden">
-  <div class="modal-card">
-    <div class="modal-dialog-header">
-      <h3 class="text-accent">QRIS TRANSAKSI KASBON</h3>
-      <span class="instruction-note">AIWA RAGIN JAJE · VERIFIKASI GM</span>
-    </div>
-
-    <div class="avatar-upload-row mt-2 mb-2" style="justify-content: center;">
-      <div id="qrcode-kasbon-container" class="card"></div>
-    </div>
-
-    <div class="time-stat-pill mb-1">
-      <small>KODE KASBON / SETORAN</small>
-      <strong id="kasbon-voucher-code-display" class="text-accent font-700">KB-00000</strong>
-    </div>
-
-    <p id="kasbon-countdown-timer" class="instruction-note mb-2 text-center text-danger font-700">
-      Berlaku: 60 Menit 00 Detik
-    </p>
-
-    <button type="button" class="btn-primary btn-full" onclick="closeKasbonQRISModal()">Tutup</button>
-  </div>
-</div>
-
-<!-- 5. MODAL SERTIFIKAT KPI DIGITAL -->
+<!-- 3. MODAL SERTIFIKAT KPI DIGITAL -->
 <div id="kpi-cert-modal" class="modal-overlay hidden">
   <div class="modal-card" style="max-width: 440px;">
     
@@ -166,12 +119,32 @@
   </div>
 </div>
 
-<!-- 6. TOAST NOTIFIKASI KELUAR -->
+<!-- 4. MODAL SANGGAHAN AUDIT KPI -->
+<div id="crosscheck-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="text-align: left; padding: 1.25rem;">
+    <div class="modal-dialog-header" style="padding: 0 0 0.8rem 0;">
+      <h3 style="font-size: 0.95rem; font-weight: 800;">Ajukan Sanggahan KPI</h3>
+      <span class="instruction-note">Koreksi perhitungan performa ke General Manager</span>
+    </div>
+    <form id="form-kpi-crosscheck" onsubmit="submitKPICrosscheck(event)">
+      <div class="form-group mb-3">
+        <label>ALASAN SANGGAHAN / KOREKSI</label>
+        <textarea id="crosscheck-reason-input" class="custom-textarea" rows="4" required placeholder="Tuliskan tanggal dan alasan ketidaksesuaian data absensi/tugas..."></textarea>
+      </div>
+      <div class="grid-2 gap-sm">
+        <button type="submit" class="btn-primary">Kirim Sanggahan</button>
+        <button type="button" class="btn-secondary-line" onclick="closeCrosscheckModal()">Batal</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 5. TOAST NOTIFIKASI KELUAR -->
 <div id="toast-exit" class="toast-exit-bubble hidden">
   <span>Tekan sekali lagi untuk keluar</span>
 </div>
 
-<!-- 7. MODAL NOTIFIKASI DIALOG (OK) -->
+<!-- 6. MODAL NOTIFIKASI DIALOG (OK) -->
 <div id="custom-modal" class="modal-overlay hidden">
   <div class="modal-card">
     <div class="modal-dialog-header">
@@ -186,7 +159,7 @@
   </div>
 </div>
 
-<!-- 8. MODAL KONFIRMASI (YES / NO) -->
+<!-- 7. MODAL KONFIRMASI (YES / NO) -->
 <div id="confirm-modal" class="modal-overlay hidden">
   <div class="modal-card">
     <div class="modal-dialog-header">
@@ -202,7 +175,7 @@
   </div>
 </div>
 
-<!-- 9. MODAL CROP AVATAR -->
+<!-- 8. MODAL CROP AVATAR -->
 <div id="crop-modal" class="modal-overlay hidden">
   <div class="modal-card crop-modal-card">
     <div class="crop-modal-header">
@@ -218,7 +191,7 @@
   </div>
 </div>
 
-<!-- 10. MODAL EDIT LOG ABSENSI (GM / ADMIN) -->
+<!-- 9. MODAL EDIT LOG ABSENSI (GM / ADMIN) -->
 <div id="edit-attendance-modal" class="modal-overlay hidden">
   <div class="modal-card" style="max-width: 340px; text-align: left; padding: 1.25rem;">
     <div class="modal-dialog-header" style="padding: 0 0 0.8rem 0;">

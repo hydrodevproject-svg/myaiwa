@@ -1,54 +1,49 @@
+<!-- ==========================================================================
+     VIEWS/TAB-ACCOUNTING.HTML - LAPORAN KPI MULTI-LEVEL (ADAPTIF ROLE)
+     MYAIWA - AIWA RAGIN JAJE SYSTEM
+     ========================================================================== -->
+
 <div id="tab-accounting" class="tab-content hidden">
-  <div class="grid-2">
-    <div class="card stat-card">
-      <h3>Status Database</h3>
-      <p class="stat-value text-db-status mt-1">Terhubung Aktif</p>
-    </div>
-    <div class="card stat-card">
-      <h3>Modul Aktif</h3>
-      <p class="stat-value mt-1">HR & Presensi</p>
-    </div>
-  </div>
-
-  <div class="card mb-2 mt-2">
-    <div class="sheet-section-title mb-1">
-      <span class="text-uppercase-label font-700">STATUS JENJANG KARIR</span>
-      <span id="user-career-level-badge" class="badge-status-work">JUNIOR</span>
-    </div>
-
-    <div class="mt-1 mb-1">
-      <small class="instruction-note">Tingkatan Karir Saat Ini</small>
-      <strong id="user-career-title" class="hero-user-name">Junior Staff</strong>
-    </div>
-
-    <div class="time-stat-pill mt-1 text-left">
-      <small>Tunjangan Jabatan Aktif</small>
-      <strong id="user-career-allowance-display" class="text-db-status">Rp 0 / bulan</strong>
-    </div>
-  </div>
-
-  <div class="card mt-2">
+  
+  <!-- 1. SEKSI PERFORMA PRIBADI (TAMPIL DI SEMUA LEVEL AKUN) -->
+  <div class="card mb-2">
     <div class="sheet-section-title mb-2">
-      <span class="text-uppercase-label">Finalisasi & Sertifikat KPI Bulanan</span>
-      <span id="kpi-verify-status-badge" class="badge-status-work">DRAFT BULAN BERJALAN</span>
+      <span class="text-uppercase-label font-700">Performa KPI Pribadi</span>
+      <span id="kpi-verify-status-badge" class="badge-status-work">BULAN BERJALAN</span>
     </div>
 
+    <!-- Metrik Skor & Status -->
     <div class="grid-2 gap-sm mb-2">
-      <div class="time-stat-pill">
+      <div class="time-stat-pill text-left">
         <small>Skor Akhir KPI</small>
-        <strong id="final-kpi-score-display" class="text-accent">0%</strong>
+        <strong id="final-kpi-score-display" class="text-accent" style="font-size: 1.15rem;">0%</strong>
       </div>
-      <div class="time-stat-pill">
-        <small>Status Performa</small>
-        <strong id="final-kpi-grade-display">Kurang</strong>
+      <div class="time-stat-pill text-left">
+        <small>Status Evaluasi</small>
+        <strong id="final-kpi-grade-display" style="font-size: 1.15rem;">Kurang</strong>
       </div>
     </div>
 
-    <div id="kpi-crosscheck-box" class="time-stat-pill mb-2 hidden text-left">
-      <small class="font-700">CATATAN CROSCHECK / AUDIT:</small>
+    <!-- Status Karir & Tunjangan -->
+    <div class="time-stat-pill text-left mb-2">
+      <div class="hero-top-row mb-1">
+        <div>
+          <small>Jenjang Karir Staf</small>
+          <strong id="user-career-title" style="font-size: 0.85rem; display: block; margin-top: 2px;">Junior Staff</strong>
+        </div>
+        <span id="user-career-level-badge" class="badge-status-work">JUNIOR</span>
+      </div>
+      <small>Tunjangan Jabatan Aktif:</small>
+      <span id="user-career-allowance-display" class="font-700 text-db-status" style="font-size: 0.78rem;">Rp 0 / bulan</span>
+    </div>
+
+    <!-- Catatan Crosscheck -->
+    <div id="kpi-crosscheck-box" class="time-stat-pill mb-2 hidden text-left" style="background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.25);">
+      <small class="font-700 text-accent">STATUS SANGGAHAN AUDIT:</small>
       <span id="kpi-crosscheck-note-display" class="instruction-note mt-1">-</span>
     </div>
 
+    <!-- Tombol Aksi Sertifikat & Sanggahan -->
     <div class="grid-2 gap-sm">
       <button type="button" class="btn-primary" id="btn-print-kpi-cert" onclick="openKPICertificateModal()">
         <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -62,8 +57,66 @@
           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
         </svg>
-        <span>Ajukan Croscheck</span>
+        <span>Ajukan Koreksi</span>
       </button>
     </div>
   </div>
+
+  <!-- 2. SEKSI MANAJEMEN TIM (OTOMATIS TAMPIL KHUSUS GM, IT, & ADMIN) -->
+  <div id="management-kpi-section" class="hidden">
+    
+    <!-- Filter Leaderboard -->
+    <div class="card mb-2">
+      <div class="sheet-section-title mb-2">
+        <span class="text-uppercase-label font-700">Filter Evaluasi Tim</span>
+        <span class="badge-status-work">MANAGEMENT VIEW</span>
+      </div>
+      
+      <div class="grid-2 gap-sm">
+        <div class="form-group mb-0">
+          <label>PERIODE BULAN</label>
+          <input type="month" id="filter-kpi-leaderboard-month" class="custom-date-input" onchange="renderGMLeaderboardReport()">
+        </div>
+        <div class="form-group mb-0">
+          <label>KATEGORI ROLE</label>
+          <select id="filter-kpi-leaderboard-role" onchange="renderGMLeaderboardReport()">
+            <option value="all">Semua Role Tim</option>
+            <option value="staff">Staff Outlet</option>
+            <option value="logistik">Staff Logistik</option>
+            <option value="admin">Staff Admin</option>
+            <option value="it">Staff IT</option>
+            <option value="gm">General Manager</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Papan Peringkat Tim -->
+    <div class="card mb-2">
+      <div class="sheet-section-title mb-2">
+        <span class="text-uppercase-label font-700">Peringkat & Kinerja Seluruh Tim</span>
+        <small id="kpi-ranking-count-badge">0 Karyawan</small>
+      </div>
+
+      <div class="form-group mb-2">
+        <input type="text" id="search-leaderboard-user" placeholder="Cari nama pada ranking tim..." onkeyup="filterLeaderboardReport()" autocomplete="off">
+      </div>
+
+      <div id="gm-leaderboard-container" class="product-scroll-list max-h-280">
+        <p class="placeholder-text">Memuat laporan performa tim...</p>
+      </div>
+    </div>
+
+    <!-- Audit Tugas & SOP Belum Selesai -->
+    <div class="card">
+      <div class="sheet-section-title mb-2">
+        <span class="text-uppercase-label text-danger font-700">Audit Tugas & SOP Belum Selesai</span>
+        <span class="badge-status-work badge-kurang">EVALUASI</span>
+      </div>
+      <div id="gm-uncompleted-tasks-container" class="product-scroll-list max-h-280 mt-1">
+        <p class="placeholder-text">Memuat riwayat evaluasi tugas...</p>
+      </div>
+    </div>
+  </div>
+
 </div>

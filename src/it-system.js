@@ -2,7 +2,7 @@
    MYAIWA - IT SUPERADMIN, METRICS, AUDIT LOGS, BACKUP & MASS RESTORE
    ========================================================================== */
 
-import { db } from "../firebase-config.js";
+import { db, auth } from "../firebase-config.js";
 import { 
   collection, 
   getDocs, 
@@ -11,7 +11,9 @@ import {
   deleteDoc, 
   serverTimestamp, 
   query, 
-  limit 
+  limit,
+  getCountFromServer,
+  writeBatch 
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 import { 
@@ -27,27 +29,29 @@ import {
 } from "./utils.js";
 
 // ==========================================
-// 1. METRIK DATABASE & KESEHATAN SERVER
+// 1. METRIK DATABASE & KESEHATAN SERVER (RINGAN & EFISIEN)
 // ==========================================
 export async function calculateDatabaseMetrics() {
   try {
-    const [attSnap, reqSnap, usersSnap, slipsSnap] = await Promise.all([
-      getDocs(collection(db, "attendance")),
-      getDocs(collection(db, "employee_requests")),
-      getDocs(collection(db, "users")),
-      getDocs(collection(db, "salary_slips_archive"))
+    // Agregasi Server (Hemat Read Firestore)
+    const [attCountSnap, reqCountSnap, usersCountSnap, slipsCountSnap] = await Promise.all([
+      getCountFromServer(collection(db, "attendance")),
+      getCountFromServer(collection(db, "employee_requests")),
+      getCountFromServer(collection(db, "users")),
+      getCountFromServer(collection(db, "salary_slips_archive"))
     ]);
 
-    const totalDocs = attSnap.size + reqSnap.size + usersSnap.size + slipsSnap.size;
-    let totalBytes = 0;
-    
-    attSnap.forEach(d => totalBytes += JSON.stringify(d.data()).length);
-    reqSnap.forEach(d => totalBytes += JSON.stringify(d.data()).length);
-    usersSnap.forEach(d => totalBytes += JSON.stringify(d.data()).length);
-    slipsSnap.forEach(d => totalBytes += JSON.stringify(d.data()).length);
+    const attCount = attCountSnap.data().count;
+    const reqCount = reqCountSnap.data().count;
+    const usersCount = usersCountSnap.data().count;
+    const slipsCount = slipsCountSnap.data().count;
 
-    const usedKB = (totalBytes / 1024).toFixed(2);
-    const pctStorage = Math.min(100, ((totalBytes / (1024 * 1024 * 1024)) * 100)).toFixed(1);
+    const totalDocs = attCount + reqCount + usersCount + slipsCount;
+    
+    // Estimasi ukuran rata-rata dokumen
+    const estimatedBytes = totalDocs * 1200;
+    const usedKB = (estimatedBytes / 1024).toFixed(2);
+    const pctStorage = Math.min(100, ((estimatedBytes / (1024 * 1024 * 1024)) * 100)).toFixed(2);
     const pctDoc = Math.min(100, (totalDocs / 5000) * 100).toFixed(0);
 
     const storagePctEl = document.getElementById("it-storage-pct");
@@ -56,7 +60,7 @@ export async function calculateDatabaseMetrics() {
     
     if (storagePctEl) storagePctEl.innerText = `${pctStorage}%`;
     if (storageFillEl) storageFillEl.style.width = `${Math.max(4, pctStorage)}%`;
-    if (storageTextEl) storageTextEl.innerText = `${usedKB} KB / 1.024 MB Digunakan`;
+    if (storageTextEl) storageTextEl.innerText = `~${usedKB} KB (Estimasi) / 1.024 MB`;
 
     const docPctEl = document.getElementById("it-doc-pct");
     const docFillEl = document.getElementById("it-doc-fill");
@@ -110,9 +114,10 @@ export function renderITUsersTable(list) {
   tbody.innerHTML = list.map(u => {
     const rawRole = String(u.role || 'staff').toLowerCase();
     const displayRole = (ROLE_DISPLAY_NAMES[rawRole] || rawRole).toUpperCase();
+    const termLabel = u.payroll_term === "termin_2" ? "T2 (15)" : "T1 (1)";
     return `
       <tr>
-        <td><strong>${u.nama || '-'}</strong><br><small>${u.email || '-'}</small></td>
+        <td><strong>${u.nama || '-'}</strong><br><small>${u.email || '-'} · <b style="color:var(--text-accent);">${termLabel}</b></small></td>
         <td><span class="badge-status-work">${displayRole}</span></td>
         <td class="text-right">
           <button class="btn-danger-sm" onclick="deleteUserAccount('${u.id}')">Hapus</button>
@@ -295,7 +300,7 @@ export async function exportDatabaseBackup(format = "json") {
 }
 
 // ==========================================
-// 5. PEMBERSIHAN MASSAL (DANGER ZONE)
+// 5. PEMBERSIHAN MASSAL (DENGAN ATOMIC WRITE BATCH)
 // ==========================================
 export async function executeMassDatabaseWipe() {
   const isConfirmed1 = await showCustomConfirm(
@@ -310,7 +315,7 @@ export async function executeMassDatabaseWipe() {
   );
   if (!isConfirmed2) return;
 
-  showLoading("Membersihkan database secara massal...");
+  showLoading("Membersihkan database secara massal (Batch Mode)...");
 
   const collectionsToWipe = ["attendance", "salary_slips_archive", "employee_requests", "salary_structures", "daily_task_logs", "staff_tasks"];
   let totalDeleted = 0;
@@ -318,9 +323,15 @@ export async function executeMassDatabaseWipe() {
   try {
     for (const colName of collectionsToWipe) {
       const snap = await getDocs(collection(db, colName));
-      for (const docSnap of snap.docs) {
-        await deleteDoc(doc(db, colName, docSnap.id));
-        totalDeleted++;
+      if (snap.empty) continue;
+
+      const docs = snap.docs;
+      for (let i = 0; i < docs.length; i += 450) {
+        const batch = writeBatch(db);
+        const chunk = docs.slice(i, i + 450);
+        chunk.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+        totalDeleted += chunk.length;
       }
     }
 
@@ -369,7 +380,7 @@ export async function importDatabaseData(file, targetCol) {
 
         for (const row of rows) {
           const payload = { ...row, imported_at: serverTimestamp() };
-          delete payload.id; // Hindari duplikasi field ID internal
+          delete payload.id;
           await addDoc(collection(db, targetCol), payload);
         }
 

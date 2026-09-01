@@ -1,29 +1,43 @@
+<!-- ==========================================================================
+     VIEWS/TAB-ABSENSI.HTML - PRESENSI GPS & RIWAYAT KEHADIRAN PRIBADI
+     MYAIWA - AIWA RAGIN JAJE SYSTEM
+     ========================================================================== -->
+
 <div id="tab-absensi" class="tab-content hidden">
   <div class="card attendance-time-card">
+    
+    <!-- HEADER STATUS SHIFT & CEK GPS -->
     <div class="attendance-time-header">
-      <div class="attendance-info-group">
-        <span class="badge-status-work" id="user-shift-mode-badge">SHIFT PAGI · MODE WFO</span>
-      </div>
-      <button type="button" class="btn-cek-gps" id="btn-refresh-gps-action" onclick="refreshMapLibreGPS()">
-        <div id="gps-spinner-monotone" class="ios-monotone-spinner hidden"></div>
-        <svg id="gps-icon-monotone" class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a8 8 0 00-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 00-8-8zm0 11a3 3 0 110-6 3 3 0 010 6z"/></svg>
+      <span id="user-shift-mode-badge" class="badge-status-work">MEMUAT SHIFT...</span>
+      <button type="button" class="btn-cek-gps" onclick="refreshMapLibreGPS()">
+        <svg id="gps-icon-monotone" class="icon-inline" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2a8 8 0 00-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 00-8-8zm0 11a3 3 0 110-6 3 3 0 010 6z"/>
+        </svg>
+        <div id="gps-spinner-monotone" class="ios-spinner spinner-xs hidden"></div>
         <span id="gps-btn-text">CEK GPS</span>
       </button>
     </div>
 
-    <div id="maplibre-view" class="leaflet-map-box mt-2"></div>
+    <!-- PETA LOKASI MAPLIBRE -->
+    <div id="maplibre-view" class="leaflet-map-box mb-2"></div>
 
-    <div class="ahsan-radius-box mt-2" id="gps-radius-status-box">
+    <!-- STATUS RADIUS GPS -->
+    <div id="gps-radius-status-box" class="ahsan-radius-box mb-2">
       <div class="radius-icon">
-        <svg class="icon-inline" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a8 8 0 00-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 00-8-8zm0 11a3 3 0 110-6 3 3 0 010 6z"/></svg>
+        <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
       </div>
       <div class="radius-text">
-        <strong>MENDETEKSI LOKASI GPS...</strong>
-        <span>Pastikan izin lokasi browser aktif.</span>
+        <strong>MENENTUKAN RADIUS...</strong>
+        <span>Tekan tombol 'CEK GPS' untuk mendeteksi posisi Anda.</span>
       </div>
     </div>
 
-    <div class="grid-2 gap-sm mt-3">
+    <!-- STATISTIK JAM HARI INI -->
+    <div class="grid-2 gap-sm mb-2">
       <div class="time-stat-pill">
         <small>Jam Check-In</small>
         <strong id="today-checkin-time">--:--</strong>
@@ -34,28 +48,40 @@
       </div>
     </div>
 
-    <button id="btn-trigger-attendance" class="btn-primary btn-full mt-3 btn-absen-large" onclick="executeGPSAttendance()">
-      <span>Proses Presensi Sekarang</span>
+    <!-- TOMBOL UTAMA CHECK-IN / CHECK-OUT -->
+    <button type="button" id="btn-trigger-attendance" class="btn-primary btn-full btn-absen-large mb-2" onclick="executeGPSAttendance()">
+      <span>Proses Absensi Masuk</span>
     </button>
 
-    <div class="grid-2 gap-sm mt-2">
+    <!-- TOMBOL KAPSUL SAKIT (+) & IZIN -->
+    <div class="grid-2 gap-sm">
       <button type="button" class="btn-sakit-custom" onclick="openLeaveFormPage('Sakit')">
-        <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
         <span>SAKIT</span>
       </button>
+
       <button type="button" class="btn-izin-custom" onclick="openLeaveFormPage('Izin')">
-        <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+        </svg>
         <span>IZIN</span>
       </button>
     </div>
   </div>
 
-  <div class="card mt-2">
+  <!-- RIWAYAT KEHADIRAN PRIBADI -->
+  <div class="card">
     <div class="sheet-section-title mb-2">
-      <span class="text-uppercase-label">Riwayat Kehadiran Saya</span>
-      <small id="attendance-count-badge">0 Hari</small>
+      <span class="text-uppercase-label font-700">Riwayat Kehadiran Saya</span>
+      <small id="attendance-count-badge">0 Hari Terakhir</small>
     </div>
-    <div id="attendance-history-list" class="product-scroll-list max-h-280">
+    <div id="attendance-history-list" class="picker-list-scroll max-h-280">
       <p class="placeholder-text">Memuat riwayat kehadiran...</p>
     </div>
   </div>

@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MYAIWA - DAILY TASKS, ACCURATE KPI ENGINE & GM LEADERBOARD
+   MYAIWA - DAILY TASKS, ACCURATE KPI ENGINE & GM LEADERBOARD (MULTI-LEVEL)
    MYAIWA - AIWA RAGIN JAJE SYSTEM
    ========================================================================== */
 
@@ -19,7 +19,8 @@ import {
   state, 
   ROLE_DEFAULT_SOP, 
   ROLE_DISPLAY_NAMES, 
-  DEFAULT_ROLE_PARAMS 
+  DEFAULT_ROLE_PARAMS,
+  CAREER_ALLOWANCE_PRESETS
 } from "./constants.js";
 
 import { 
@@ -28,6 +29,7 @@ import {
   notify, 
   showCustomConfirm, 
   calculateLateThresholdTime,
+  navigateToTab,
   getLocalDateWITA 
 } from "./utils.js";
 
@@ -164,7 +166,7 @@ export async function submitDailyTasksFinal() {
   );
   if (!confirmSubmit) return;
 
-  showLoading("Mengunci laporan tugas operasional...");
+  showLoading();
 
   try {
     const logRef = doc(db, "daily_task_logs", `${user.uid}_${todayStr}`);
@@ -185,7 +187,7 @@ export async function submitDailyTasksFinal() {
 }
 
 // ==========================================
-// 3. ENGINE KALKULASI KPI AKUMULATIF USER
+// 3. ENGINE KALKULASI KPI AKUMULATIF USER (BEBAS COMPOSITE INDEX)
 // ==========================================
 export async function calculateUserKPI(uid) {
   try {
@@ -194,14 +196,23 @@ export async function calculateUserKPI(uid) {
     const isITAccount = (userRoleKey === "it");
     const roleCfg = state.roleParamsCache[userRoleKey] || DEFAULT_ROLE_PARAMS[userRoleKey] || DEFAULT_ROLE_PARAMS.staff;
 
-    // 1. Data Absensi Bulan Berjalan
-    const attSnap = await getDocs(query(
-      collection(db, "attendance"),
-      where("uid", "==", uid)
-    ));
+    const [attSnap, taskLogsSnap, customTasksSnap] = await Promise.all([
+      getDocs(query(
+        collection(db, "attendance"),
+        where("uid", "==", uid)
+      )),
+      getDocs(query(
+        collection(db, "daily_task_logs"),
+        where("uid", "==", uid)
+      )),
+      getDocs(query(
+        collection(db, "staff_tasks"),
+        where("uid", "==", uid)
+      ))
+    ]);
 
     let totalPresence = 0;
-    let effectivePresenceDays = 0; // Menghitung penyesuaian denda 25% izin pulang awal
+    let effectivePresenceDays = 0;
     let wfoCount = 0;
     let wfaCount = 0;
     let lateCount = 0;
@@ -213,7 +224,6 @@ export async function calculateUserKPI(uid) {
       if (data.date && data.date.startsWith(currentMonthStr) && data.status === "Hadir") {
         totalPresence++;
 
-        // Logika Pulang Awal: Izin dipotong 25% (0.75 hari), Sakit 0% denda (1.0 hari)
         if (data.early_leave_type === "Izin") {
           effectivePresenceDays += 0.75;
         } else {
@@ -242,7 +252,6 @@ export async function calculateUserKPI(uid) {
 
     state.currentMonthITWfaCount = wfaCount;
 
-    // Target Hari Kerja Bulanan (Roster 26 hari efektif)
     const targetWorkingDays = 26;
     const targetWFO = Math.ceil(targetWorkingDays * 0.6);
     const targetWFA = targetWorkingDays - targetWFO;
@@ -257,16 +266,10 @@ export async function calculateUserKPI(uid) {
     }
     attendanceScore = Math.max(0, attendanceScore - (lateCount * 2));
 
-    // 2. Kalkulasi Tugas & SOP
     const defaultTasks = ROLE_DEFAULT_SOP[userRoleKey] || ROLE_DEFAULT_SOP.staff;
     const dailySOPCount = defaultTasks.length;
     const totalPossibleSOPMonth = totalPresence * dailySOPCount;
     let totalCompletedSOPMonth = 0;
-
-    const taskLogsSnap = await getDocs(query(
-      collection(db, "daily_task_logs"),
-      where("uid", "==", uid)
-    ));
 
     taskLogsSnap.forEach(d => {
       const log = d.data();
@@ -275,11 +278,6 @@ export async function calculateUserKPI(uid) {
         totalCompletedSOPMonth += doneList.length;
       }
     });
-
-    const customTasksSnap = await getDocs(query(
-      collection(db, "staff_tasks"),
-      where("uid", "==", uid)
-    ));
 
     let totalPossibleCustomMonth = 0;
     let totalCompletedCustomMonth = 0;
@@ -304,7 +302,6 @@ export async function calculateUserKPI(uid) {
 
     state.currentUserTaskScore = taskMonthlyScore;
 
-    // Skor KPI Gabungan (70% Kehadiran + 30% Kepatuhan Tugas)
     let finalScore = Math.min(100, Math.round((attendanceScore * 0.7) + (taskMonthlyScore * 0.3)));
 
     const itBreakdownEl = document.getElementById("it-kpi-breakdown");
@@ -381,11 +378,31 @@ export async function calculateUserKPI(uid) {
     const finalGradeEl = document.getElementById("final-kpi-grade-display");
     const careerBadgeEl = document.getElementById("user-career-level-badge");
     const careerTitleEl = document.getElementById("user-career-title");
+    const allowanceEl = document.getElementById("user-career-allowance-display");
+
+    const careerLevel = state.currentUserData?.career_level || "Junior";
+    const customAllowance = state.currentUserData?.custom_allowance;
+    const allowanceVal = customAllowance !== undefined && customAllowance !== null && customAllowance !== ""
+      ? Number(customAllowance)
+      : (CAREER_ALLOWANCE_PRESETS[careerLevel] || 0);
 
     if (finalScoreEl) finalScoreEl.innerText = `${finalScore}%`;
     if (finalGradeEl) finalGradeEl.innerText = statusText;
-    if (careerBadgeEl) careerBadgeEl.innerText = (state.currentUserData?.career_level || "Junior").toUpperCase();
-    if (careerTitleEl) careerTitleEl.innerText = `${state.currentUserData?.career_level || 'Junior'} Staff`;
+    if (careerBadgeEl) careerBadgeEl.innerText = careerLevel.toUpperCase();
+    if (careerTitleEl) careerTitleEl.innerText = `${careerLevel} Staff`;
+    if (allowanceEl) allowanceEl.innerText = `Rp ${allowanceVal.toLocaleString('id-ID')} / bulan`;
+
+    getDoc(doc(db, "kpi_crosschecks", `${uid}_${currentMonthStr}`)).then(snap => {
+      const crossBox = document.getElementById("kpi-crosscheck-box");
+      const crossNote = document.getElementById("kpi-crosscheck-note-display");
+      if (snap.exists() && crossBox && crossNote) {
+        const data = snap.data();
+        crossBox.classList.remove("hidden");
+        crossNote.innerText = `[${data.status || 'Diajukan'}]: "${data.note || '-'}"`;
+      } else if (crossBox) {
+        crossBox.classList.add("hidden");
+      }
+    }).catch(() => {});
 
   } catch (e) {
     console.error("Gagal menghitung KPI:", e);
@@ -393,15 +410,48 @@ export async function calculateUserKPI(uid) {
 }
 
 // ==========================================
-// 4. GM LEADERBOARD
+// 4. INISIALISASI & SINKRONISASI TAB LAPORAN KPI
+// ==========================================
+export async function initKPIReportTab() {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const userRole = String(state.currentUserData?.role || 'staff').toLowerCase();
+  const isManagement = ['gm', 'it', 'admin'].includes(userRole);
+
+  const managementSection = document.getElementById("management-kpi-section");
+  const monthInput = document.getElementById("filter-kpi-leaderboard-month");
+
+  if (monthInput && !monthInput.value) {
+    monthInput.value = getLocalDateWITA().slice(0, 7);
+  }
+
+  await calculateUserKPI(user.uid);
+
+  if (isManagement) {
+    managementSection?.classList.remove("hidden");
+    await renderGMLeaderboardReport();
+  } else {
+    managementSection?.classList.add("hidden");
+  }
+}
+
+// ==========================================
+// 5. GM LEADERBOARD
 // ==========================================
 export async function renderGMLeaderboardReport() {
   const container = document.getElementById("gm-leaderboard-container");
   const uncompletedContainer = document.getElementById("gm-uncompleted-tasks-container");
-  const monthInput = document.getElementById("filter-kpi-leaderboard-month")?.value || getLocalDateWITA().slice(0, 7);
+  const monthInputEl = document.getElementById("filter-kpi-leaderboard-month");
+
+  const currentMonth = getLocalDateWITA().slice(0, 7);
+  if (monthInputEl && !monthInputEl.value) {
+    monthInputEl.value = currentMonth;
+  }
+  const monthInput = monthInputEl?.value || currentMonth;
 
   if (!container) return;
-  container.innerHTML = "<p class='placeholder-text'>Menghitung rekapitulasi performa tim...</p>";
+  container.innerHTML = "<p class='placeholder-text'>Menghitung performa seluruh tim...</p>";
 
   try {
     if (!state.allEmployeesCache || state.allEmployeesCache.length === 0) {
@@ -529,7 +579,7 @@ export async function renderGMLeaderboardReport() {
 
     if (uncompletedContainer) {
       if (uncompletedTasksList.length === 0) {
-        uncompletedContainer.innerHTML = "<p class='placeholder-text' style='color:#10b981;'>Seluruh tugas khusus & SOP bulan ini terpantau selesai.</p>";
+        uncompletedContainer.innerHTML = "<p class='placeholder-text' style='color:#10b981;'>Seluruh tugas khusus & SOP bulan ini selesai.</p>";
       } else {
         uncompletedContainer.innerHTML = uncompletedTasksList.map(t => {
           const emp = state.allEmployeesCache.find(u => u.id === t.uid);
@@ -559,7 +609,7 @@ export function filterLeaderboardReport() {
   if (!container) return;
 
   let filtered = (state.leaderboardReportCache || []).filter(u => {
-    const matchQuery = !q || u.nama.toLowerCase().includes(q) || u.role.toLowerCase().includes(q);
+    const matchQuery = !q || (u.nama && u.nama.toLowerCase().includes(q)) || (u.role && u.role.toLowerCase().includes(q));
     const matchRole = (roleFilter === "all") || (u.role === roleFilter);
     return matchQuery && matchRole;
   });
@@ -607,50 +657,69 @@ export function filterLeaderboardReport() {
 }
 
 // ==========================================
-// 5. SERTIFIKAT KPI DIGITAL
+// 6. SERTIFIKAT KPI DIGITAL (LAMAN PENUH / FULL PAGE)
 // ==========================================
 export function openKPICertificateModal() {
   const user = auth.currentUser;
   if (!user || !state.currentUserData) return;
 
   const monthStr = getLocalDateWITA().slice(0, 7);
-  const certModal = document.getElementById("kpi-cert-modal");
 
-  document.getElementById("cert-employee-name").innerText = state.currentUserData.nama || user.email;
-  document.getElementById("cert-employee-role").innerText = (ROLE_DISPLAY_NAMES[state.currentUserData.role] || state.currentUserData.role || 'Staff').toUpperCase();
-  document.getElementById("cert-verification-code").innerText = `CERT-${monthStr.replace("-", "")}-${user.uid.slice(0, 6).toUpperCase()}`;
+  const nameEl = document.getElementById("cert-employee-name");
+  const roleEl = document.getElementById("cert-employee-role");
+  const codeEl = document.getElementById("cert-verification-code");
+
+  if (nameEl) nameEl.innerText = state.currentUserData.nama || user.email;
+  if (roleEl) roleEl.innerText = (ROLE_DISPLAY_NAMES[state.currentUserData.role] || state.currentUserData.role || 'Staff').toUpperCase();
+  if (codeEl) codeEl.innerText = `CERT-${monthStr.replace("-", "")}-${user.uid.slice(0, 6).toUpperCase()}`;
 
   const currentScore = document.getElementById("kpi-score-badge")?.innerText || "0%";
   const currentPresence = document.getElementById("kpi-attendance-count")?.innerText || "0 Hari";
   const currentStatus = document.getElementById("kpi-status-tag")?.innerText || "Kurang";
   const taskScoreVal = `${state.currentUserTaskScore || 0}%`;
 
-  document.getElementById("cert-score-val").innerText = currentScore;
-  document.getElementById("cert-presence-val").innerText = currentPresence;
-  document.getElementById("cert-task-val").innerText = taskScoreVal;
-  
-  const certBadge = document.getElementById("cert-status-badge");
-  if (certBadge) certBadge.innerText = `PRESTASI ${currentStatus.toUpperCase()}`;
+  const scoreEl = document.getElementById("cert-score-val");
+  const presenceEl = document.getElementById("cert-presence-val");
+  const taskEl = document.getElementById("cert-task-val");
+  const badgeEl = document.getElementById("cert-status-badge");
 
-  certModal?.classList.remove("hidden");
+  if (scoreEl) scoreEl.innerText = currentScore;
+  if (presenceEl) presenceEl.innerText = currentPresence;
+  if (taskEl) taskEl.innerText = taskScoreVal;
+  if (badgeEl) badgeEl.innerText = `PRESTASI ${currentStatus.toUpperCase()}`;
+
+  navigateToTab('kpi-cert-page');
 }
 
 export function closeKPICertModal() {
-  document.getElementById("kpi-cert-modal")?.classList.add("hidden");
+  navigateToTab('accounting');
 }
 
 export function printKPICertificate() {
   window.print();
 }
 
-export async function openCrosscheckModal() {
+export function openCrosscheckModal() {
+  const user = auth.currentUser;
+  if (!user) return;
+  const inputReason = document.getElementById("crosscheck-reason-input");
+  if (inputReason) inputReason.value = "";
+  document.getElementById("crosscheck-modal")?.classList.remove("hidden");
+}
+
+export function closeCrosscheckModal() {
+  document.getElementById("crosscheck-modal")?.classList.add("hidden");
+}
+
+export async function submitKPICrosscheck(e) {
+  if (e) e.preventDefault();
   const user = auth.currentUser;
   if (!user) return;
 
-  const reason = prompt("Tuliskan alasan sanggahan atau koreksi data KPI yang tidak sesuai:");
-  if (!reason || reason.trim() === "") return;
+  const reason = document.getElementById("crosscheck-reason-input")?.value.trim();
+  if (!reason) return notify("Perhatian", "Tuliskan alasan sanggahan atau koreksi data KPI.");
 
-  showLoading("Mengirimkan permintaan sanggahan...");
+  showLoading();
   const monthStr = getLocalDateWITA().slice(0, 7);
 
   try {
@@ -659,12 +728,13 @@ export async function openCrosscheckModal() {
       nama: state.currentUserData?.nama || user.email,
       role: state.currentUserData?.role || "staff",
       month: monthStr,
-      note: reason.trim(),
+      note: reason,
       status: "Menunggu Audit GM",
       timestamp: serverTimestamp()
     }, { merge: true });
 
     hideLoading();
+    closeCrosscheckModal();
     notify("Terkirim", "Permintaan sanggahan telah diteruskan ke GM.");
     calculateUserKPI(user.uid);
   } catch (err) {

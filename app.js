@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MYAIWA - AIWA RAGIN JAJE (MAIN ENTRY POINT & DISPATCHER)
+   MYAIWA - AIWA RAGIN JAJE (MAIN ENTRY POINT & ACTION BRIDGE)
    ========================================================================== */
 
 import { auth, db } from "./firebase-config.js";
@@ -15,45 +15,181 @@ import * as PayrollKasbon from "./src/payroll-kasbon.js";
 import * as HR from "./src/hr-management.js";
 import * as IT from "./src/it-system.js";
 
-// EKSPOS FUNGSI KE GLOBAL WINDOW
-Object.assign(window, {
+// ==========================================
+// 1. ISOLASI NAMESPACE & ACTION DISPATCHER
+// ==========================================
+const publicActions = {
   state,
-  ...Utils,
-  ...Auth,
-  ...Attendance,
-  ...TasksKPI,
-  ...PayrollKasbon,
-  ...HR,
-  ...IT
+  // Utils & Navigasi
+  navigateToTab: Utils.navigateToTab,
+  openFinanceSubPage: Utils.openFinanceSubPage,
+  closeFinanceSubPage: Utils.closeFinanceSubPage,
+  openHRSubPage: Utils.openHRSubPage,
+  closeHRSubPage: Utils.closeHRSubPage,
+  openITSubPage: Utils.openITSubPage,
+  closeITSubPage: Utils.closeITSubPage,
+  switchGlobalTheme: Utils.switchGlobalTheme,
+  togglePasswordVisibility: Utils.togglePasswordVisibility,
+  forceUpdateAndClearCache: Utils.forceUpdateAndClearCache,
+  triggerPWAInstall: Utils.triggerPWAInstall,
+  closeModal: Utils.closeModal,
+  closeCropModal: Utils.closeCropModal,
+  updateFileName: Utils.updateFileName,
+
+  // Auth & Profile
+  triggerLogout: Auth.triggerLogout,
+  openCropperModal: Auth.openCropperModal,
+
+  // Absensi & GPS
+  refreshMapLibreGPS: Attendance.refreshMapLibreGPS,
+  executeGPSAttendance: Attendance.executeGPSAttendance,
+  openLeaveFormPage: Attendance.openLeaveFormPage,
+  openManualAttendancePage: Attendance.openManualAttendancePage,
+  selectReportPeriodType: Attendance.selectReportPeriodType,
+  openTargetUserPicker: Attendance.openTargetUserPicker,
+  generateAdminAttendanceReport: Attendance.generateAdminAttendanceReport,
+  openEditAttendanceModal: Attendance.openEditAttendanceModal,
+  closeEditAttendanceModal: Attendance.closeEditAttendanceModal,
+  deleteAttendanceRecord: Attendance.deleteAttendanceRecord,
+  selectEarlyLeaveCategory: Attendance.selectEarlyLeaveCategory,
+  calculateLeaveDays: Attendance.calculateLeaveDays,
+  initMapLibre: Attendance.initMapLibre,
+  cleanupMapLibre: Attendance.cleanupMapLibre,
+  checkTodayAttendance: Attendance.checkTodayAttendance,
+
+  // Tugas & KPI
+  submitDailyTasksFinal: TasksKPI.submitDailyTasksFinal,
+  toggleDailyTaskStatus: TasksKPI.toggleDailyTaskStatus,
+  calculateUserKPI: TasksKPI.calculateUserKPI,
+  initKPIReportTab: TasksKPI.initKPIReportTab,
+  renderGMLeaderboardReport: TasksKPI.renderGMLeaderboardReport,
+  filterLeaderboardReport: TasksKPI.filterLeaderboardReport,
+  openKPICertificateModal: TasksKPI.openKPICertificateModal,
+  closeKPICertModal: TasksKPI.closeKPICertModal,
+  printKPICertificate: TasksKPI.printKPICertificate,
+  openCrosscheckModal: TasksKPI.openCrosscheckModal,
+  closeCrosscheckModal: TasksKPI.closeCrosscheckModal,
+  submitKPICrosscheck: TasksKPI.submitKPICrosscheck,
+  loadDailyTaskChecklist: TasksKPI.loadDailyTaskChecklist,
+
+  // Finance, Payroll & Kasbon
+  compileEmployeeSlip: PayrollKasbon.compileEmployeeSlip,
+  openMyCurrentPayslip: PayrollKasbon.openMyCurrentPayslip,
+  viewCurrentMonthPayslip: PayrollKasbon.openMyCurrentPayslip,
+  lockAndPublishMonthlySlips: PayrollKasbon.lockAndPublishMonthlySlips,
+  renderUserSlipHistory: PayrollKasbon.renderUserSlipHistory,
+  openPayslipDetail: PayrollKasbon.openPayslipDetail,
+  openClaimSalaryPage: PayrollKasbon.openClaimSalaryPage,
+  selectDisbursementMethod: PayrollKasbon.selectDisbursementMethod,
+  submitSalaryDisbursement: PayrollKasbon.submitSalaryDisbursement,
+  openGMScannerModal: PayrollKasbon.openGMScannerModal,
+  closeGMScannerModal: PayrollKasbon.closeGMScannerModal,
+  validateManualVoucherCode: PayrollKasbon.validateManualVoucherCode,
+  validateScannedOperationalCode: PayrollKasbon.validateScannedOperationalCode,
+  openShareOptionsModal: Utils.notify,
+  closeShareOptionsModal: Utils.closeModal,
+  printPayslip: PayrollKasbon.printPayslip,
+  exportPayslipFile: PayrollKasbon.exportPayslipFile,
+  getKasbonTierLimits: PayrollKasbon.getKasbonTierLimits,
+  openKasbonForm: PayrollKasbon.openKasbonForm,
+  closeKasbonForm: PayrollKasbon.closeKasbonForm,
+  calculateKasbonInstallment: PayrollKasbon.calculateKasbonInstallment,
+  submitKasbonTransaction: PayrollKasbon.submitKasbonTransaction,
+  loadKasbonAccountSummary: PayrollKasbon.loadKasbonAccountSummary,
+  openKasbonQRISPage: PayrollKasbon.openKasbonQRISPage,
+  showKasbonQRISModal: PayrollKasbon.openKasbonQRISPage,
+  closeKasbonQRISModal: PayrollKasbon.closeKasbonQRISModal,
+  loadHRRequestsList: PayrollKasbon.loadHRRequestsList,
+  approveDisbursement: PayrollKasbon.approveDisbursement,
+  updateRequestStatus: PayrollKasbon.updateRequestStatus,
+  closeQRReceiptModal: PayrollKasbon.closeQRReceiptModal,
+  openKasbonPaymentDetailModal: PayrollKasbon.openKasbonPaymentDetailModal,
+  closeKasbonPaymentDetailModal: PayrollKasbon.closeKasbonPaymentDetailModal,
+
+  // HR Management
+  setRosterDay: HR.setRosterDay,
+  selectSpecificShiftOption: HR.selectSpecificShiftOption,
+  openCareerPromotionForm: HR.openCareerPromotionForm,
+  onCareerLevelPresetChange: HR.onCareerLevelPresetChange,
+  filterCareerPathList: HR.filterCareerPathList,
+  navigateToEmployeePickerPage: HR.navigateToEmployeePickerPage,
+  renderEmployeePickerItems: HR.renderEmployeePickerItems,
+  filterEmployeePickerPageList: HR.filterEmployeePickerPageList,
+  selectEmployeeFromPicker: HR.selectEmployeeFromPicker,
+  openRoleParameterPage: HR.openRoleParameterPage,
+  handleSaveRoleParameters: HR.handleSaveRoleParameters,
+  saveAssignedShift: HR.saveAssignedShift,
+  loadHRUserOptions: HR.loadHRUserOptions,
+  loadCareerPathList: HR.loadCareerPathList,
+  populateReportUserDropdown: Attendance.populateReportUserDropdown,
+
+  // IT System
+  initITPanel: IT.initITPanel,
+  refreshITMetrics: IT.refreshITMetrics,
+  loadITUsersList: IT.loadITUsersList,
+  filterITUsersList: IT.filterITUsersList,
+  deleteUserAccount: IT.deleteUserAccount,
+  loadAuditLogs: IT.loadAuditLogs,
+  filterAuditLogs: IT.filterAuditLogs,
+  exportDatabaseBackup: IT.exportDatabaseBackup,
+  executeMassDatabaseWipe: IT.executeMassDatabaseWipe,
+  calculateDatabaseMetrics: IT.calculateDatabaseMetrics
+};
+
+Object.assign(window, publicActions);
+
+// ==========================================
+// 2. GLOBAL EVENT CAPTURE & NETWORK MONITOR
+// ==========================================
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  state.deferredPWAInstallPrompt = e;
 });
 
-// INISIALISASI UTAMA DENGAN MEMUAT SEMUA VIEW DULU
+window.addEventListener('appinstalled', () => {
+  state.deferredPWAInstallPrompt = null;
+});
+
+window.addEventListener('online', () => {
+  Utils.notify("Koneksi Pulih", "Perangkat Anda kembali terhubung ke jaringan internet.");
+});
+
+window.addEventListener('offline', () => {
+  Utils.notify("Mode Offline", "Koneksi terputus. Sistem tetap dapat diakses menggunakan cache lokal.");
+});
+
+// ==========================================
+// 3. INISIALISASI UTAMA SIKLUS APLIKASI
+// ==========================================
 document.addEventListener("DOMContentLoaded", async () => {
-  // 1. Muat seluruh file HTML parsial ke DOM
-  await loadAllViews();
+  try {
+    await loadAllViews();
 
-  // 2. Inisialisasi UI dasar
-  Utils.initLiveClock();
-  Utils.initSavedTheme();
-  Utils.initPopStateHandler();
+    Utils.initLiveClock();
+    Utils.initSavedTheme();
+    Utils.initPopStateHandler();
 
-  // 3. Pasang Auth State Observer
-  Auth.initAuthObserver(async (user, userData) => {
-    await TasksKPI.loadDailyTaskChecklist();
-    await TasksKPI.calculateUserKPI(user.uid);
-    Attendance.checkTodayAttendance();
+    Auth.initAuthObserver(async (user, userData) => {
+      await TasksKPI.loadDailyTaskChecklist();
+      await TasksKPI.calculateUserKPI(user.uid);
+      Attendance.checkTodayAttendance();
 
-    const role = String(userData?.role || 'staff').toLowerCase();
-    if (role === "admin" || role === "gm" || role === "it") {
-      await HR.loadHRUserOptions();
-      await PayrollKasbon.loadHRRequestsList();
-    }
-  });
+      const role = String(userData?.role || 'staff').toLowerCase();
+      if (role === "admin" || role === "gm" || role === "it") {
+        await HR.loadHRUserOptions();
+        await PayrollKasbon.loadHRRequestsList();
+      }
+    });
 
-  // 4. Pasang Event Listener Form
-  attachDOMEventListeners();
+    attachDOMEventListeners();
+  } catch (err) {
+    console.error("Gagal inisialisasi aplikasi Myaiwa:", err);
+  }
 });
 
+// ==========================================
+// 4. ATTACH FORM EVENT LISTENERS
+// ==========================================
 function attachDOMEventListeners() {
   // FORM LOGIN
   document.getElementById("form-login")?.addEventListener("submit", async (e) => {
@@ -78,62 +214,7 @@ function attachDOMEventListeners() {
 
   // FORM TRANSAKSI KASBON
   document.getElementById("form-transaksi-kasbon")?.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const user = auth.currentUser;
-    if (!user) return;
-
-    const actionType = document.getElementById("kasbon-action-type").value;
-    const currentKPIStatus = document.getElementById("kpi-status-tag")?.innerText?.trim().toLowerCase() || "kurang";
-
-    if (actionType === "pinjam" && currentKPIStatus !== "memuaskan") {
-      return Utils.notify("Pengajuan Ditolak", "Status performa KPI Anda belum memenuhi syarat minimal 'Memuaskan' (>85%).");
-    }
-
-    const amount = Number(document.getElementById("kasbon-amount-input").value);
-    const note = document.getElementById("kasbon-notes-input").value.trim();
-    const monthlyInstallment = actionType === "pinjam" ? Number(document.getElementById("kasbon-monthly-installment")?.value || 0) : 0;
-    const tenorMonths = actionType === "pinjam" ? Number(document.getElementById("kasbon-tenor-months")?.value || 1) : 1;
-
-    if (!amount || amount <= 0) return Utils.notify("Perhatian", "Masukkan nominal yang valid.");
-
-    Utils.showLoading("Menerbitkan QRIS transaksi kasbon...");
-
-    try {
-      const now = Date.now();
-      const expiresAtMillis = now + (60 * 60 * 1000);
-      const isPinjam = (actionType === "pinjam");
-      const voucherCode = `${isPinjam ? 'KB' : 'BYR'}-${new Date().toISOString().slice(0, 7).replace("-", "")}-${Math.floor(1000 + Math.random() * 9000)}`;
-
-      const { collection, addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-      const payload = {
-        uid: user.uid,
-        nama: state.currentUserData?.nama || user.email,
-        role: state.currentUserData?.role || "staff",
-        type: isPinjam ? "Kasbon" : "Bayar Kasbon",
-        amount: amount,
-        monthly_installment: monthlyInstallment || amount,
-        tenor_months: tenorMonths,
-        installment_paid_count: 0,
-        total_paid: 0,
-        note: note,
-        voucher_code: voucherCode,
-        status: "Pending",
-        requested_millis: now,
-        expires_at_millis: expiresAtMillis,
-        timestamp: serverTimestamp()
-      };
-
-      await addDoc(collection(db, "employee_requests"), payload);
-
-      Utils.hideLoading();
-      document.getElementById("box-form-kasbon")?.classList.add("hidden");
-      
-      PayrollKasbon.showKasbonQRISModal(voucherCode, expiresAtMillis, payload);
-      PayrollKasbon.loadKasbonAccountSummary();
-    } catch (err) {
-      Utils.hideLoading();
-      Utils.notify("Gagal", err.message);
-    }
+    await PayrollKasbon.submitKasbonTransaction(e);
   });
 
   // PROMOSI KARIR
@@ -159,45 +240,28 @@ function attachDOMEventListeners() {
   // SHIFT & MODE KERJA
   document.getElementById("form-assign-shift")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const userId = document.getElementById("hr-select-user").value;
-    const shift = document.getElementById("hr-select-shift").value;
-    const workMode = document.getElementById("hr-select-work-mode").value;
-
-    await HR.saveAssignedShift(userId, shift, workMode);
+    await HR.saveAssignedShift(e);
   });
 
-  // STRUKTUR GAJI
+  // STRUKTUR GAJI & TERMIN
   document.getElementById("form-salary-structure")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const userId = document.getElementById("salary-select-user").value;
     const base = Number(document.getElementById("sal-base").value);
     const meal = Number(document.getElementById("sal-meal-daily").value);
+    const payrollTerm = document.getElementById("sal-payroll-term")?.value || "termin_1";
     
     const bankName = document.getElementById("sal-bank-name").value;
     const bankNumber = document.getElementById("sal-bank-number").value.trim();
     const bankHolder = document.getElementById("sal-bank-holder").value.trim();
 
-    await HR.saveSalaryStructure(userId, base, meal, bankName, bankNumber, bankHolder);
+    await HR.saveSalaryStructure(userId, base, meal, bankName, bankNumber, bankHolder, payrollTerm);
   });
 
   // PARAMETER ROLE
   document.getElementById("form-update-role-param")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const targetRoleKey = document.getElementById("target-role-param-id").value;
-    
-    const payload = {
-      pagi_start: document.getElementById("cfg-role-pagi-start").value,
-      pagi_end: document.getElementById("cfg-role-pagi-end").value,
-      malam_start: document.getElementById("cfg-role-malam-start").value,
-      malam_end: document.getElementById("cfg-role-malam-end").value,
-      it_threshold: document.getElementById("cfg-role-it-threshold").value,
-      tolerance: Number(document.getElementById("cfg-role-tolerance").value),
-      overtime_rate: Number(document.getElementById("cfg-role-overtime-rate").value),
-      late_penalty: Number(document.getElementById("cfg-role-late-penalty").value),
-      radius_meter: Number(document.getElementById("cfg-role-radius-meter").value)
-    };
-
-    await HR.saveRoleParameters(targetRoleKey, payload);
+    await HR.handleSaveRoleParameters(e);
   });
 
   // REKRUTMEN USER BARU
@@ -253,7 +317,7 @@ function attachDOMEventListeners() {
     if (!val || val <= 0) return Utils.notify("Perhatian", "Masukkan nominal pinjaman/jumlah hari yang valid.");
     if (!note) return Utils.notify("Perhatian", "Tuliskan keterangan alasan pengajuan.");
 
-    Utils.showLoading("Mengirim formulir pengajuan...");
+    Utils.showLoading();
     try {
       const { collection, addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
       await addDoc(collection(db, "employee_requests"), {
@@ -263,6 +327,7 @@ function attachDOMEventListeners() {
         amount: val,
         note: note,
         status: "Pending",
+        requested_millis: Date.now(),
         timestamp: serverTimestamp()
       });
       Utils.hideLoading();
@@ -282,8 +347,10 @@ function attachDOMEventListeners() {
     const end = document.getElementById('leave-end-date').value;
     const duration = document.getElementById('leave-duration-display').value;
     const reason = document.getElementById('leave-reason-text').value.trim();
+    const fileInput = document.getElementById('leave-file-input');
+    const file = (fileInput && fileInput.files && fileInput.files[0]) ? fileInput.files[0] : null;
 
-    await Attendance.submitLeaveRequest(start, end, duration, reason);
+    await Attendance.submitLeaveRequest(start, end, duration, reason, file);
   });
 
   // IMPORT DATABASE
@@ -298,7 +365,7 @@ function attachDOMEventListeners() {
   });
 }
 
-// SERVICE WORKER
+// SERVICE WORKER REGISTRATION
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./sw.js").catch(console.warn);

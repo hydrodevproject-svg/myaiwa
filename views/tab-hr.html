@@ -34,7 +34,7 @@
           <small>Promosi & Tunjangan</small>
         </div>
 
-        <!-- 3. STRUKTUR GAJI -->
+        <!-- 3. STRUKTUR GAJI & TERMIN -->
         <div class="hr-icon-card" onclick="openHRSubPage('hr-salary-structure')">
           <div class="hr-icon-bubble bg-soft-mint">
             <svg class="icon-inline" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -45,11 +45,11 @@
             </svg>
           </div>
           <strong>Struktur Gaji</strong>
-          <small>Pokok & Rekening</small>
+          <small>Pokok & 2 Termin</small>
         </div>
 
-        <!-- 4. LAPORAN KPI -->
-        <div class="hr-icon-card" onclick="openHRSubPage('hr-kpi-leaderboard')">
+        <!-- 4. LAPORAN KPI (LANGSUNG KE TAB ACCOUNTING TERPUSAT) -->
+        <div class="hr-icon-card" onclick="navigateToTab('accounting')">
           <div class="hr-icon-bubble bg-soft-amber">
             <svg class="icon-inline" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="8" r="7"></circle>
@@ -57,7 +57,7 @@
             </svg>
           </div>
           <strong>Laporan KPI</strong>
-          <small>Ranking & Reward</small>
+          <small>Ranking & Evaluasi</small>
         </div>
 
         <!-- 5. TERBITKAN SLIP -->
@@ -70,7 +70,7 @@
             </svg>
           </div>
           <strong>Terbitkan Slip</strong>
-          <small>Kunci & Arsip</small>
+          <small>Kunci & 2 Termin</small>
         </div>
 
         <!-- 6. PENGAJUAN STAF -->
@@ -159,12 +159,11 @@
             </div>
           </div>
 
-          <!-- PLACEHOLDER SEBELUM MEMILIH KARYAWAN -->
           <div id="box-shift-placeholder" class="placeholder-text card mt-2" style="background:var(--input-bg);">
             Silakan pilih karyawan di atas untuk mengatur shift sesuai divisinya.
           </div>
 
-          <!-- 1. BLOK KHUSUS: STAFF OUTLET (ROSTER MINGGUAN 7 HARI + 1 LIBUR) -->
+          <!-- STAFF OUTLET -->
           <div id="box-shift-staff-outlet" class="hidden mt-2">
             <div class="sheet-section-title mb-1">
               <span class="text-uppercase-label font-700 text-accent">JADWAL ROSTER MINGGUAN (STAFF OUTLET)</span>
@@ -238,7 +237,7 @@
             </div>
           </div>
 
-          <!-- 2. BLOK KHUSUS: STAFF ADMIN -->
+          <!-- ADMIN -->
           <div id="box-shift-admin" class="hidden mt-2">
             <div class="sheet-section-title mb-1">
               <span class="text-uppercase-label font-700 text-accent">PENGATURAN SHIFT ADMIN</span>
@@ -273,7 +272,7 @@
             </div>
           </div>
 
-          <!-- 3. BLOK KHUSUS: STAFF LOGISTIK -->
+          <!-- LOGISTIK -->
           <div id="box-shift-logistik" class="hidden mt-2">
             <div class="sheet-section-title mb-1">
               <span class="text-uppercase-label font-700 text-accent">SHIFT STAFF LOGISTIK</span>
@@ -292,7 +291,7 @@
             </div>
           </div>
 
-          <!-- 4. BLOK KHUSUS: STAFF IT -->
+          <!-- IT -->
           <div id="box-shift-it" class="hidden mt-2">
             <div class="sheet-section-title mb-1">
               <span class="text-uppercase-label font-700 text-accent">SISTEM KERJA HYBRID (STAFF IT)</span>
@@ -304,7 +303,7 @@
             </div>
           </div>
 
-          <!-- 5. BLOK KHUSUS: GENERAL MANAGER -->
+          <!-- GM -->
           <div id="box-shift-gm" class="hidden mt-2">
             <div class="sheet-section-title mb-1">
               <span class="text-uppercase-label font-700 text-accent">SHIFT GENERAL MANAGER</span>
@@ -372,12 +371,12 @@
       </div>
     </div>
 
-    <!-- SUBTAB 3: STRUKTUR GAJI -->
+    <!-- SUBTAB 3: STRUKTUR GAJI & TERMIN -->
     <div id="subtab-hr-salary-structure" class="sub-tab-content hr-feature-page hidden">
       <div class="card">
         <div class="sheet-section-title mb-2">
           <span class="text-uppercase-label">Komponen & Struktur Gaji Staf</span>
-          <span class="badge-completed">PAYROLL</span>
+          <span class="badge-completed">PAYROLL 2 TERMIN</span>
         </div>
         <form id="form-salary-structure" class="mt-2">
           <div class="form-group">
@@ -400,6 +399,15 @@
                 <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg>
               </div>
             </div>
+          </div>
+
+          <div class="form-group mt-2">
+            <label>TERMIN PENGGAJIAN KARYAWAN</label>
+            <select id="sal-payroll-term" required>
+              <option value="termin_1">Termin 1 (Tanggal 1 Setiap Bulan)</option>
+              <option value="termin_2">Termin 2 (Tanggal 15 Setiap Bulan)</option>
+            </select>
+            <small class="instruction-note text-accent">* Menentukan kelompok jadwal penerbitan dan pencairan gaji karyawan.</small>
           </div>
 
           <div class="grid-2 gap-sm mt-1">
@@ -441,75 +449,33 @@
             </div>
           </div>
 
-          <button type="submit" class="btn-primary btn-full mt-3">Simpan Struktur Gaji</button>
+          <button type="submit" class="btn-primary btn-full mt-3">Simpan Struktur Gaji & Termin</button>
         </form>
       </div>
     </div>
 
-    <!-- SUBTAB 4: KPI LEADERBOARD -->
-    <div id="subtab-hr-kpi-leaderboard" class="sub-tab-content hr-feature-page hidden">
-      <div class="card mb-2">
-        <div class="sheet-section-title mb-2">
-          <span class="text-uppercase-label">Filter Evaluasi Performa Tim</span>
-          <span class="badge-status-work">GM DASHBOARD</span>
-        </div>
-        
-        <div class="grid-2 gap-sm">
-          <div class="form-group mb-0">
-            <label>PILIH PERIODE BULAN</label>
-            <input type="month" id="filter-kpi-leaderboard-month" class="custom-date-input" value="2026-08" onchange="renderGMLeaderboardReport()">
-          </div>
-          <div class="form-group mb-0">
-            <label>PILIH KATEGORI ROLE</label>
-            <select id="filter-kpi-leaderboard-role" onchange="renderGMLeaderboardReport()">
-              <option value="all">Semua Kategori Role</option>
-              <option value="staff">Staff Outlet</option>
-              <option value="logistik">Staff Logistik</option>
-              <option value="admin">Staff Admin</option>
-              <option value="it">Staff IT</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <div class="card mb-2">
-        <div class="sheet-section-title mb-2">
-          <span class="text-uppercase-label">Papan Peringkat & Rekomendasi Reward</span>
-          <small id="kpi-ranking-count-badge">0 Karyawan</small>
-        </div>
-
-        <div class="form-group mb-2">
-          <input type="text" id="search-leaderboard-user" placeholder="Cari nama pada ranking..." onkeyup="filterLeaderboardReport()" autocomplete="off">
-        </div>
-
-        <div id="gm-leaderboard-container" class="product-scroll-list max-h-280">
-          <p class="placeholder-text">Memuat laporan performa tim...</p>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="sheet-section-title mb-2">
-          <span class="text-uppercase-label text-danger font-700">Audit Tugas & SOP Yang Tidak Selesai</span>
-          <span class="badge-status-work badge-kurang">EVALUASI</span>
-        </div>
-        <div id="gm-uncompleted-tasks-container" class="product-scroll-list max-h-280 mt-1">
-          <p class="placeholder-text">Memuat riwayat evaluasi tugas...</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- SUBTAB 5: TERBITKAN SLIP GAJI -->
+    <!-- SUBTAB 4: TERBITKAN SLIP GAJI -->
     <div id="subtab-hr-publish-salary" class="sub-tab-content hr-feature-page hidden">
       <div class="card">
         <div class="sheet-section-title mb-2">
           <span class="text-uppercase-label">Penerbitan & Kunci Slip Gaji</span>
-          <span class="badge-completed">PAYROLL AUTO</span>
+          <span class="badge-completed">2-TERMIN BATCH</span>
         </div>
-        <p class="instruction-note mb-2">Kunci dan terbitkan arsip slip gaji seluruh karyawan untuk periode yang dipilih ke dalam database permanen.</p>
+        <p class="instruction-note mb-2">Kunci dan terbitkan arsip slip gaji seluruh karyawan berdasarkan periode dan kelompok termin penggajian.</p>
         
         <div class="form-group mt-2">
           <label>PILIH PERIODE BULAN</label>
           <input type="month" id="publish-month-picker" class="custom-date-input" value="2026-08">
+        </div>
+
+        <div class="form-group mt-2">
+          <label>PILIH KELOMPOK TERMIN PENERBITAN</label>
+          <select id="publish-termin-picker">
+            <option value="all">Semua Termin (Termin 1 & Termin 2)</option>
+            <option value="termin_1">Khusus Termin 1 (Tanggal 1)</option>
+            <option value="termin_2">Khusus Termin 2 (Tanggal 15)</option>
+          </select>
+          <small class="instruction-note text-accent">* Slip hanya diterbitkan untuk karyawan yang terdaftar pada termin yang dipilih.</small>
         </div>
 
         <button type="button" class="btn-primary btn-full mt-3" onclick="lockAndPublishMonthlySlips()">
@@ -519,7 +485,7 @@
       </div>
     </div>
 
-    <!-- SUBTAB 6: PENUGASAN KHUSUS -->
+    <!-- SUBTAB 5: PENUGASAN KHUSUS -->
     <div id="subtab-hr-tasks-assign" class="sub-tab-content hr-feature-page hidden">
       <div class="card">
         <div class="sheet-section-title mb-2">
@@ -564,7 +530,7 @@
       </div>
     </div>
 
-    <!-- SUBTAB 7: MENU PILIHAN ROLE (PARAMETER) -->
+    <!-- SUBTAB 6: MENU PILIHAN ROLE (PARAMETER) -->
     <div id="subtab-hr-params-menu" class="sub-tab-content hr-feature-page hidden">
       <div class="card">
         <div class="sheet-section-title mb-2">
@@ -615,7 +581,7 @@
       </div>
     </div>
 
-    <!-- SUBTAB 8: FORM PARAMETER ROLE (DENGAN ONSUBMIT HANDLER) -->
+    <!-- SUBTAB 7: FORM PARAMETER ROLE -->
     <div id="subtab-hr-role-param-form" class="sub-tab-content hr-feature-page hidden">
       <div class="card">
         <div class="sheet-section-title mb-2">
@@ -675,7 +641,7 @@
       </div>
     </div>
 
-    <!-- SUBTAB 9: REQUESTS & VALIDASI GM -->
+    <!-- SUBTAB 8: REQUESTS & VALIDASI GM -->
     <div id="subtab-hr-requests" class="sub-tab-content hr-feature-page hidden">
       <div class="card mb-2">
         <div class="sheet-section-title mb-2">
@@ -699,7 +665,7 @@
       </div>
     </div>
 
-    <!-- SUBTAB 10: GENERATOR LAPORAN & MANAJEMEN ABSENSI GM -->
+    <!-- SUBTAB 9: GENERATOR LAPORAN & MANAJEMEN ABSENSI GM -->
     <div id="subtab-hr-attendance" class="sub-tab-content hr-feature-page hidden">
       <div class="card mb-2 no-print">
         <div class="sheet-section-title mb-2">
@@ -712,7 +678,6 @@
           <span class="badge-status-work">GM ENGINE</span>
         </div>
 
-        <!-- TARGET KARYAWAN -->
         <div class="form-group mb-2">
           <label>TARGET KARYAWAN</label>
           <input type="hidden" id="report-select-user" value="all">
@@ -735,7 +700,6 @@
           </div>
         </div>
 
-        <!-- TIPE PERIODE (SEGMENTED TABS) -->
         <div class="form-group mb-2">
           <label>TIPE PERIODE LAPORAN</label>
           <input type="hidden" id="report-period-type" value="daily">
@@ -751,7 +715,6 @@
           </div>
         </div>
 
-        <!-- FILTER WAKTU (HARIAN & BULANAN) -->
         <div class="form-group mb-2" id="box-report-daily">
           <label>PILIH TANGGAL</label>
           <input type="date" id="report-filter-date" class="custom-date-input">
@@ -762,7 +725,6 @@
           <input type="month" id="report-filter-month" class="custom-date-input">
         </div>
 
-        <!-- TOMBOL AKSI UTAMA -->
         <div class="grid-2 gap-sm mt-2">
           <button type="button" class="btn-primary" style="display:inline-flex; align-items:center; justify-content:center; gap:8px;" onclick="generateAdminAttendanceReport()">
             <svg class="icon-inline" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -782,10 +744,8 @@
         </div>
       </div>
 
-      <!-- KARTU RINGKASAN STATISTIK -->
       <div id="admin-report-summary-box" class="att-summary-card mb-2 hidden"></div>
 
-      <!-- CONTAINER HASIL LOG ABSENSI -->
       <div class="card" id="printable-attendance-report-area">
         <div class="sheet-section-title mb-2">
           <span class="text-uppercase-label font-700">Daftar Hasil Log Absensi</span>
@@ -797,7 +757,7 @@
       </div>
     </div>
 
-    <!-- SUBTAB 11: LAMAN TAMBAH ABSENSI MANUAL -->
+    <!-- SUBTAB 10: LAMAN TAMBAH ABSENSI MANUAL -->
     <div id="subtab-hr-manual-attendance" class="sub-tab-content hr-feature-page hidden">
       <div class="card">
         <div class="sheet-section-title mb-1">

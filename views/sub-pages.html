@@ -1,285 +1,359 @@
 <!-- ==========================================================================
-     VIEWS/SUB-PAGES.HTML - SUB-HALAMAN NAVIGASI APLIKASI (LENGKAP)
+     VIEWS/SUB-PAGES.HTML - SUB-PAGES & SECONDARY FORM TABS
      MYAIWA - AIWA RAGIN JAJE SYSTEM
      ========================================================================== -->
 
-<!-- 1. SUB-PAGE: UBAH PASSWORD -->
-<div id="tab-change-pass" class="tab-content hidden">
-  <div class="card">
-    <div class="sheet-section-title mb-3">
-      <span class="text-uppercase-label">Ubah Password Akun</span>
-    </div>
-
-    <form id="form-direct-change-pass">
-      <div class="form-group">
-        <label>Password Saat Ini</label>
-        <input type="password" id="pass-current" required placeholder="Masukkan password lama">
-      </div>
-      <div class="form-group">
-        <label>Password Baru</label>
-        <input type="password" id="pass-new" required placeholder="Minimal 6 karakter">
-      </div>
-      <div class="form-group">
-        <label>Konfirmasi Password Baru</label>
-        <input type="password" id="pass-confirm" required placeholder="Ulangi password baru">
-      </div>
-
-      <button type="submit" id="btn-submit-change-pass" class="btn-primary btn-full mt-3">Simpan Password Baru</button>
-      <button type="button" class="btn-secondary-line btn-full mt-2" onclick="navigateToTab('profile')">Batal</button>
-    </form>
-  </div>
-</div>
-
-<!-- 2. SUB-PAGE: FORM CUTI/SAKIT SEHARIAN (SEBELUM MASUK) -->
-<div id="tab-leave-form" class="tab-content hidden">
-  <div class="card mb-2">
-    <div class="sheet-section-title mb-2">
-      <span class="text-uppercase-label" id="leave-page-header-title">Formulir Pengajuan Sakit / Izin</span>
-      <span class="badge-status-work" id="leave-badge-type">SAKIT</span>
-    </div>
-
-    <form id="form-submit-leave">
-      <div class="grid-2 gap-sm">
-        <div class="form-group">
-          <label>DARI TANGGAL</label>
-          <input type="date" id="leave-start-date" required class="custom-date-input" onchange="calculateLeaveDays()">
-        </div>
-        <div class="form-group">
-          <label>SAMPAI TANGGAL</label>
-          <input type="date" id="leave-end-date" required class="custom-date-input" onchange="calculateLeaveDays()">
-        </div>
-      </div>
-
-      <div class="form-group mt-1">
-        <label>TOTAL DURASI HARI</label>
-        <input type="text" id="leave-duration-display" value="1 Hari" readonly class="readonly-display">
-      </div>
-
-      <div class="form-group mt-1">
-        <label>KETERANGAN ALASAN LENGKAP</label>
-        <textarea id="leave-reason-text" class="custom-textarea" rows="3" required placeholder="Tuliskan keterangan detail sakit / keperluan izin..."></textarea>
-      </div>
-
-      <div class="form-group mt-1">
-        <label id="leave-attachment-label">UNGGAH BUKTI (SURAT DOKTER / DOKUMEN)</label>
-        <div class="custom-file-upload">
-          <input type="file" id="leave-file-input" class="file-input-hidden" accept="image/*,.pdf" onchange="updateFileName(this, 'leave-file-label-display')">
-          <label for="leave-file-input" class="file-upload-card-btn">
-            <div class="file-btn-action-pill">
-              <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-              <span>Pilih Dokumen</span>
-            </div>
-            <span id="leave-file-label-display" class="file-status-text">Belum ada file dipilih</span>
-          </label>
-        </div>
-      </div>
-
-      <button type="submit" id="btn-submit-leave-request" class="btn-primary btn-full mt-3">Kirim Pengajuan Sekarang</button>
-    </form>
-  </div>
-</div>
-
-<!-- 3. SUB-PAGE: FORM PULANG LEBIH AWAL (IZIN/SAKIT SEBELUM SHIFT BERAKHIR) -->
+<!-- 1. FORMULIR PENGAJUAN PULANG AWAL -->
 <div id="tab-early-leave-form" class="tab-content hidden">
-  <div class="card mb-2">
+  <div class="card">
     <div class="sheet-section-title mb-2">
       <span class="text-uppercase-label font-700">Pengajuan Pulang Awal</span>
-      <span class="badge-status-work" style="color:#f59e0b;">SEBELUM SHIFT BERAKHIR</span>
+      <span class="badge-status-work">SEBELUM SHIFT BERAKHIR</span>
     </div>
-    <small class="instruction-note mb-2">Presensi hari ini tetap tercatat <b>HADIR</b>. Pilih kategori kepulangan lebih awal:</small>
+    <p class="instruction-note mb-2">Presensi hari ini tetap tercatat <b>HADIR</b>. Pilih kategori kepulangan lebih awal:</p>
 
     <form id="form-submit-early-leave" onsubmit="submitEarlyLeaveRequest(event)">
-      <div class="grid-2 gap-sm mb-2 mt-1">
+      <input type="hidden" id="early-leave-category" value="Sakit">
+
+      <div class="grid-2 gap-sm mb-2">
         <div class="shift-select-card active-shift" id="card-early-sakit" onclick="selectEarlyLeaveCategory('Sakit')">
-          <strong style="color:#ef4444;">Sakit Mendadak</strong>
+          <strong>Sakit Mendadak</strong>
           <small>Denda KPI: <b>0% (Bebas)</b></small>
         </div>
         <div class="shift-select-card" id="card-early-izin" onclick="selectEarlyLeaveCategory('Izin')">
-          <strong style="color:#f59e0b;">Izin Keperluan</strong>
+          <strong>Izin Keperluan</strong>
           <small>Denda KPI: <b>-25% Hari Ini</b></small>
         </div>
       </div>
-      <input type="hidden" id="early-leave-category" value="Sakit">
 
       <div class="form-group mb-2">
         <label>JAM KELUAR AKTUAL</label>
-        <input type="text" id="early-leave-checkout-time" readonly class="readonly-display">
+        <input type="text" id="early-leave-checkout-time" class="readonly-display" readonly>
       </div>
 
-      <div class="form-group mb-2">
+      <div class="form-group mb-3">
         <label>ALASAN LENGKAP PULANG AWAL</label>
         <textarea id="early-leave-reason" class="custom-textarea" rows="3" required placeholder="Jelaskan alasan kondisi sakit atau keperluan mendadak..."></textarea>
       </div>
 
       <div class="grid-2 gap-sm mt-3">
-        <button type="submit" class="btn-primary">Konfirmasi & Check-Out</button>
+        <button type="submit" class="btn-primary">Check-Out</button>
         <button type="button" class="btn-secondary-line" onclick="navigateToTab('absensi')">Batal</button>
       </div>
     </form>
   </div>
 </div>
 
-<!-- 4. SUB-PAGE: FORM PENGAJUAN STAF (KASBON/LAINNYA) -->
-<div id="tab-employee-request-page" class="tab-content hidden">
-  <div class="card mb-2">
+<!-- 2. FORMULIR PENGAJUAN CUTI & IZIN RESMI -->
+<div id="tab-leave-form" class="tab-content hidden">
+  <div class="card">
     <div class="sheet-section-title mb-2">
-      <span class="text-uppercase-label" id="emp-req-page-title">Formulir Pengajuan Staf</span>
-      <span class="badge-status-work" id="emp-req-page-badge">KASBON</span>
+      <span class="text-uppercase-label font-700" id="leave-page-header-title">Formulir Pengajuan Izin</span>
+      <span class="badge-status-work" id="leave-badge-type">IZIN</span>
     </div>
 
-    <form id="form-submit-emp-request-page">
-      <div class="form-group mt-1">
-        <label id="emp-req-page-label-val">NOMINAL PINJAMAN (RP)</label>
-        <input type="number" id="emp-req-page-val" required placeholder="Contoh: 500000" min="1">
+    <form id="form-submit-leave">
+      <div class="grid-2 gap-sm mb-2">
+        <div class="form-group mb-0">
+          <label>TANGGAL MULAI</label>
+          <input type="date" id="leave-start-date" class="custom-date-input" required onchange="calculateLeaveDays()">
+        </div>
+        <div class="form-group mb-0">
+          <label>TANGGAL SELESAI</label>
+          <input type="date" id="leave-end-date" class="custom-date-input" required onchange="calculateLeaveDays()">
+        </div>
       </div>
 
-      <div class="form-group mt-1">
-        <label>KETERANGAN KEPERLUAN</label>
-        <textarea id="emp-req-page-note" class="custom-textarea" rows="3" required placeholder="Tuliskan alasan pengajuan secara jelas..."></textarea>
+      <div class="form-group mb-2">
+        <label>TOTAL ESTIMASI HARI</label>
+        <input type="text" id="leave-duration-display" class="readonly-display" value="1 Hari" readonly>
       </div>
 
-      <button type="submit" id="btn-submit-emp-request-execute" class="btn-primary btn-full mt-3">Kirim Pengajuan</button>
+      <div class="form-group mb-2">
+        <label>KETERANGAN ALASAN PENGAJUAN</label>
+        <textarea id="leave-reason-text" class="custom-textarea" rows="3" required placeholder="Tuliskan keterangan lengkap alasan pengajuan..."></textarea>
+      </div>
+
+      <div class="form-group mb-3">
+        <label id="leave-attachment-label">UNGGAH DOKUMEN / BUKTI KEPERLUAN</label>
+        <label for="leave-file-input" class="file-upload-card-btn">
+          <span class="file-btn-action-pill">
+            <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+            <span>Pilih Berkas</span>
+          </span>
+          <span id="leave-file-label-display" class="file-status-text">Belum ada file dipilih</span>
+        </label>
+        <input type="file" id="leave-file-input" class="file-input-hidden" accept="image/*,application/pdf" onchange="updateFileName(this, 'leave-file-label-display')">
+      </div>
+
+      <div class="grid-2 gap-sm mt-3">
+        <button type="submit" class="btn-primary">Kirim Pengajuan</button>
+        <button type="button" class="btn-secondary-line" onclick="navigateToTab('absensi')">Batal</button>
+      </div>
     </form>
   </div>
 </div>
 
-<!-- 5. SUB-PAGE: SLIP GAJI DIGITAL -->
-<div id="tab-payslip-page" class="tab-content hidden">
-  <div class="card corporate-payslip-card mb-2" id="printable-payslip">
-    <div class="corporate-payslip-header">
-      <div class="corp-brand-left">
-        <div>
-          <h2 class="corp-slip-company">AIWA RAGIN JAJE</h2>
-          <span class="corp-slip-tagline">PAYROLL DISBURSEMENT SYSTEM · CONFIDENTIAL</span>
+<!-- 3. FORMULIR UBAH PASSWORD AKUN -->
+<div id="tab-change-pass" class="tab-content hidden">
+  <div class="card">
+    <div class="sheet-section-title mb-2">
+      <span class="text-uppercase-label font-700">Ubah Password Akun</span>
+      <span class="badge-status-work">KEAMANAN</span>
+    </div>
+
+    <form id="form-direct-change-pass">
+      <div class="form-group mb-2">
+        <label>PASSWORD SAAT INI</label>
+        <input type="password" id="pass-current" required placeholder="Masukkan password lama">
+      </div>
+
+      <div class="form-group mb-2">
+        <label>PASSWORD BARU</label>
+        <input type="password" id="pass-new" required placeholder="Minimal 6 karakter">
+      </div>
+
+      <div class="form-group mb-3">
+        <label>KONFIRMASI PASSWORD BARU</label>
+        <input type="password" id="pass-confirm" required placeholder="Ulangi password baru">
+      </div>
+
+      <div class="grid-2 gap-sm mt-3">
+        <button type="submit" class="btn-primary">Simpan Password Baru</button>
+        <button type="button" class="btn-secondary-line" onclick="navigateToTab('profile')">Batal</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 4. LAMAN KLAIM & PENCAIRAN GAJI (VOUCHER QRIS) -->
+<div id="tab-claim-salary" class="tab-content hidden">
+  <div class="card mb-2 text-center">
+    <div class="sheet-section-title mb-2">
+      <span class="text-uppercase-label font-700">Klaim Gaji Digital</span>
+      <span class="badge-completed">VERIFIKASI GM</span>
+    </div>
+
+    <div class="time-stat-pill text-left mb-2">
+      <small>TOTAL GAJI BERSIH (TAKE HOME PAY)</small>
+      <strong id="claim-total-amount-display" class="text-accent" style="font-size: 1.25rem;">Rp 0</strong>
+      <span id="claim-period-display" class="text-muted-xs font-600 mt-1" style="display:block;">Periode: -</span>
+    </div>
+
+    <form id="form-submit-claim-salary" onsubmit="submitSalaryDisbursement(event)">
+      <input type="hidden" id="claim-disbursement-method" value="transfer">
+
+      <div class="form-group mb-2 text-left">
+        <label>PILIH METODE PENCAIRAN</label>
+        <div class="grid-2 gap-sm">
+          <div class="method-select-card active-method" id="method-card-transfer" onclick="selectDisbursementMethod('transfer')">
+            <svg class="icon-inline mb-1" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+              <line x1="2" y1="10" x2="22" y2="10"></line>
+            </svg>
+            <strong>Transfer Bank</strong>
+            <small>Ke Rekening Resmi</small>
+          </div>
+
+          <div class="method-select-card" id="method-card-tunai" onclick="selectDisbursementMethod('tunai')">
+            <svg class="icon-inline mb-1" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"></path>
+              <line x1="12" y1="6" x2="12" y2="8"></line>
+              <line x1="12" y1="16" x2="12" y2="18"></line>
+            </svg>
+            <strong>Kas Tunai Toko</strong>
+            <small>Ambil di Outlet</small>
+          </div>
         </div>
       </div>
-      <div class="corp-slip-status-box">
-        <span class="corp-verified-badge">TERVERIFIKASI SISTEM</span>
-        <small class="corp-doc-code" id="slip-meta-doc-id">DOC-2026-PAY</small>
-      </div>
-    </div>
 
-    <div class="payslip-body mt-3" id="payslip-page-content-box"></div>
+      <div id="box-claim-bank-info" class="time-stat-pill text-left mb-3">
+        <small class="font-700 text-accent">REKENING TUJUAN TRANSFER:</small>
+        <strong id="claim-bank-account-target" style="font-size: 0.82rem; margin-top: 2px;">-</strong>
+      </div>
 
-    <div class="payslip-signature-box mt-3">
-      <div class="sig-col">
-        <small>Diterbitkan Resmi,</small>
-        <strong>Finance & HR Management</strong>
+      <div class="grid-2 gap-sm mt-3">
+        <button type="submit" class="btn-primary">Terbitkan Voucher Klaim</button>
+        <button type="button" class="btn-secondary-line" onclick="navigateToTab('payslip-page')">Kembali</button>
       </div>
-      <div class="sig-col text-right">
-        <small>Penerima Manfaat,</small>
-        <strong id="payslip-sig-name">Karyawan</strong>
-      </div>
-    </div>
+    </form>
   </div>
+</div>
 
-  <div class="mt-2 no-print" id="payslip-action-buttons-wrap">
-    <button type="button" class="btn-primary btn-full mb-1" id="btn-claim-salary-action" onclick="openClaimSalaryPage()">
-      <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-      <span id="claim-btn-label">Tarik Gaji Ini</span>
-    </button>
+<!-- 5. LAMAN DETAIL RINCIAN SLIP GAJI DIGITAL -->
+<div id="tab-payslip-page" class="tab-content hidden">
+  <div class="card mb-2" id="printable-payslip-area">
+    <div class="sheet-section-title mb-2">
+      <span class="text-uppercase-label font-700">Slip Gaji Elektronik</span>
+      <span id="payslip-termin-badge" class="badge-status-work">TERMIN 1</span>
+    </div>
 
-    <div class="grid-2 gap-sm">
-      <button type="button" class="btn-action-simple" onclick="printPayslip()">
-        <svg class="icon-inline" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+    <div class="text-center mb-2" style="border-bottom: 0.5px dashed var(--border-color); padding-bottom: 0.75rem;">
+      <h2 style="font-size: 1.1rem; font-weight: 800; margin: 0; color: var(--text-primary);">AIWA RAGIN JAJE</h2>
+      <span id="payslip-period-label" style="font-size: 0.7rem; color: var(--text-secondary); font-weight: 600;">Periode: -</span>
+      <div id="payslip-employee-meta" class="mt-1" style="font-size: 0.75rem; font-weight: 700; color: var(--text-accent);">-</div>
+    </div>
+
+    <div class="mb-2">
+      <span class="sheet-section-title mb-1 font-700 text-accent" style="font-size: 0.65rem;">KOMPONEN PENDAPATAN</span>
+      <div class="request-item-row" style="padding: 4px 0;">
+        <span style="font-size: 0.72rem;">Gaji Pokok:</span>
+        <strong id="slip-val-base" style="font-size: 0.75rem;">Rp 0</strong>
+      </div>
+      <div class="request-item-row" style="padding: 4px 0;">
+        <span style="font-size: 0.72rem;" id="slip-label-meal">Uang Makan:</span>
+        <strong id="slip-val-meal" style="font-size: 0.75rem;">Rp 0</strong>
+      </div>
+      <div class="request-item-row" style="padding: 4px 0;">
+        <span style="font-size: 0.72rem;" id="slip-label-allowance">Tunjangan Jabatan:</span>
+        <strong id="slip-val-allowance" style="font-size: 0.75rem;">Rp 0</strong>
+      </div>
+      <div class="request-item-row" style="padding: 4px 0;">
+        <span style="font-size: 0.72rem;">Lembur / Bonus:</span>
+        <strong id="slip-val-overtime" style="font-size: 0.75rem;">Rp 0</strong>
+      </div>
+    </div>
+
+    <div class="mb-2">
+      <span class="sheet-section-title mb-1 font-700 text-danger" style="font-size: 0.65rem;">KOMPONEN POTONGAN</span>
+      <div class="request-item-row" style="padding: 4px 0;">
+        <span style="font-size: 0.72rem;" id="slip-label-late">Keterlambatan / Alpa:</span>
+        <strong id="slip-val-late" class="text-danger" style="font-size: 0.75rem;">Rp 0</strong>
+      </div>
+      <div class="request-item-row" style="padding: 4px 0;">
+        <span style="font-size: 0.72rem;">Cicilan / Kasbon:</span>
+        <strong id="slip-val-kasbon" class="text-danger" style="font-size: 0.75rem;">Rp 0</strong>
+      </div>
+    </div>
+
+    <div class="time-stat-pill text-left mb-2" style="background: rgba(26, 75, 139, 0.08); border-color: rgba(26, 75, 139, 0.25);">
+      <small class="font-700 text-accent">GAJI BERSIH DITERIMA (TAKE HOME PAY):</small>
+      <strong id="slip-val-thp" class="text-accent" style="font-size: 1.15rem; margin-top: 2px;">Rp 0</strong>
+    </div>
+
+    <div class="grid-2 gap-sm mb-2">
+      <button type="button" class="btn-secondary-line" onclick="printPayslip()">
+        <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="6 9 6 2 18 2 18 9"></polyline>
+          <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+          <rect x="6" y="14" width="12" height="8"></rect>
+        </svg>
         <span>Cetak</span>
       </button>
-      <button type="button" class="btn-action-simple" onclick="openShareOptionsModal()">
-        <svg class="icon-inline" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <button type="button" class="btn-secondary-line" onclick="exportPayslipFile('pdf')">
+        <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
           <polyline points="7 10 12 15 17 10"></polyline>
           <line x1="12" y1="15" x2="12" y2="3"></line>
         </svg>
-        <span>Unduh Slip</span>
+        <span>Unduh PDF</span>
       </button>
     </div>
+
+    <button type="button" id="btn-claim-salary-action" class="btn-primary btn-full mb-2" onclick="openClaimSalaryPage()">
+      <svg class="icon-inline" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+        <line x1="12" y1="8" x2="12" y2="16"></line>
+        <line x1="8" y1="12" x2="16" y2="12"></line>
+      </svg>
+      <span id="claim-btn-label">Klaim & Cairkan Gaji</span>
+    </button>
   </div>
 </div>
 
-<!-- 6. SUB-PAGE: KLAIM PENARIKAN GAJI -->
-<div id="tab-claim-salary" class="tab-content hidden">
-  <div class="card mb-2">
+<!-- 6. LAMAN RIWAYAT ARSIP SLIP GAJI -->
+<div id="tab-salary-history-page" class="tab-content hidden">
+  <div class="card">
     <div class="sheet-section-title mb-2">
-      <span class="text-uppercase-label">Formulir Pencairan Gaji</span>
-      <span class="badge-completed">DISBURSEMENT</span>
+      <span class="text-uppercase-label font-700">Riwayat Arsip Slip Gaji</span>
+      <span class="badge-status-work" id="history-total-count">ARSIP DIGITAL</span>
+    </div>
+    <div id="user-slip-history-container" class="picker-list-scroll max-h-280">
+      <p class="placeholder-text">Memuat arsip penggajian...</p>
+    </div>
+  </div>
+</div>
+
+<!-- 7. FORMULIR PENGAJUAN STAF (UMUM / DANA) -->
+<div id="tab-employee-request-page" class="tab-content hidden">
+  <div class="card">
+    <div class="sheet-section-title mb-2">
+      <span class="text-uppercase-label font-700" id="emp-req-page-title">Formulir Pengajuan Staf</span>
+      <span class="badge-status-work" id="emp-req-page-badge">PENGAJUAN</span>
     </div>
 
-    <p class="instruction-note mb-2">Pilih metode pencairan Take Home Pay Anda:</p>
-
-    <div class="grid-2 gap-sm mb-2">
-      <div class="method-select-card active-method" id="card-method-cash" onclick="selectDisbursementMethod('cash')">
-        <svg class="icon-inline" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/></svg>
-        <strong class="mt-1">Tunai</strong>
-        <small>Kantor Finance</small>
+    <form id="form-submit-emp-request-page">
+      <div class="form-group mb-2">
+        <label id="emp-req-val-label">NOMINAL / JUMLAH PENGAJUAN</label>
+        <input type="number" id="emp-req-page-val" required min="0" placeholder="Masukkan nominal (Rp)...">
       </div>
 
-      <div class="method-select-card" id="card-method-transfer" onclick="selectDisbursementMethod('transfer')">
-        <svg class="icon-inline" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-        <strong class="mt-1">Non Tunai</strong>
-        <small>Transfer Bank</small>
+      <div class="form-group mb-3">
+        <label>KETERANGAN & KEPERLUAN</label>
+        <textarea id="emp-req-page-note" class="custom-textarea" rows="3" required placeholder="Tuliskan keterangan detail pengajuan..."></textarea>
+      </div>
+
+      <div class="grid-2 gap-sm mt-3">
+        <button type="submit" class="btn-primary">Kirimkan Pengajuan</button>
+        <button type="button" class="btn-secondary-line" onclick="navigateToTab('beranda')">Batal</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 8. LAMAN PENUH QRIS KASBON / SETORAN -->
+<div id="tab-qris-kasbon-page" class="tab-content hidden">
+  <div class="card text-center mb-2" style="padding: 1.5rem 1rem;">
+    <div class="sheet-section-title mb-2">
+      <span class="text-uppercase-label font-700" id="qris-page-type-title">QRIS Transaksi Kasbon</span>
+      <span class="badge-completed">VERIFIKASI GM</span>
+    </div>
+    <small class="instruction-note mb-3">Tunjukkan QR Code ini kepada General Manager untuk dipindai secara langsung.</small>
+
+    <div class="text-center mb-3" style="display: flex; justify-content: center;">
+      <div id="qrcode-kasbon-page-container" style="padding: 14px; background: #ffffff; border-radius: 16px; display: inline-block; box-shadow: var(--shadow-sm); border: 0.5px solid var(--border-color);"></div>
+    </div>
+
+    <div class="time-stat-pill text-left mb-2">
+      <div class="request-item-row" style="padding: 4px 0; border: none;">
+        <small>KODE TRANSAKSI</small>
+        <strong id="qris-page-voucher-code" class="text-accent" style="font-family: monospace; font-size: 0.95rem;">-</strong>
+      </div>
+      <div class="request-item-row" style="padding: 4px 0; border: none;">
+        <small>TOTAL NOMINAL</small>
+        <strong id="qris-page-amount" style="font-size: 0.95rem;">Rp 0</strong>
       </div>
     </div>
 
-    <div id="box-cash-detail" class="time-stat-pill mb-2 text-left">
-      <small>Lokasi Pengambilan Tunai:</small>
-      <strong>Kantor Finance AIWA RAGIN JAJE</strong>
-      <span class="instruction-note mt-1">Kode & QR Code berlaku <b>1x24 Jam</b> untuk divalidasi oleh GM / Finance.</span>
+    <div class="time-stat-pill mb-3" style="background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.25);">
+      <small style="color: #f59e0b; font-weight: 700;">MASA BERLAKU VOUCHER</small>
+      <strong id="qris-page-countdown-timer" style="color: #f59e0b; font-size: 0.85rem; margin-top: 2px;">Memuat waktu...</strong>
     </div>
 
-    <div id="box-transfer-detail" class="time-stat-pill mb-2 hidden text-left">
-      <div class="time-stat-pill mb-1">
-        <small>Rekening Terdaftar di Sistem (Oleh GM):</small>
-        <strong id="registered-bank-info-label" class="text-accent mt-1">Memuat data...</strong>
-      </div>
-
-      <div class="form-group mb-1">
-        <label>PILIH BANK TUJUAN</label>
-        <select id="transfer-bank-select">
-          <option value="BCA">BCA (Bank Central Asia)</option>
-          <option value="BRI">BRI (Bank Rakyat Indonesia)</option>
-          <option value="Mandiri">Bank Mandiri</option>
-          <option value="BNI">BNI (Bank Negara Indonesia)</option>
-          <option value="BSI">Bank Syariah Indonesia (BSI)</option>
-          <option value="Jago">Bank Jago / blu BCA</option>
-          <option value="Lainnya">Bank Lainnya</option>
-        </select>
-      </div>
-
-      <div class="form-group mb-1">
-        <label>NOMOR REKENING TUJUAN</label>
-        <input type="number" id="transfer-acc-number" placeholder="Wajib cocok dengan rekening terdaftar" required>
-      </div>
-
-      <div class="form-group mb-0">
-        <label>NAMA PEMILIK REKENING</label>
-        <input type="text" id="transfer-acc-name" placeholder="Nama sesuai buku tabungan" required>
-      </div>
-
-      <span class="instruction-note text-accent mt-1">
-        * Sistem otomatis memverifikasi kecocokan nomor rekening dengan database GM. Berlaku 1x24 Jam.
-      </span>
-    </div>
-
-    <button type="button" class="btn-primary btn-full mt-2" onclick="submitSalaryDisbursement()">
-      Konfirmasi & Ajukan Penarikan
-    </button>
-    <button type="button" class="btn-secondary-line btn-full mt-2" onclick="navigateToTab('payslip-page')">
-      Batal
+    <button type="button" class="btn-primary btn-full" onclick="closeKasbonQRISModal()">
+      <span>Kembali ke Menu Finance</span>
     </button>
   </div>
 </div>
 
-<!-- 7. SUB-PAGE: EMPLOYEE PICKER (LAMAN PENUH TANPA PEMBATAS TINGGI) -->
+<!-- 9. LAMAN PEMILIH KARYAWAN TARGET -->
 <div id="tab-employee-picker-page" class="tab-content hidden">
   <div class="card picker-full-page-card">
-    <div class="sheet-section-title mb-1">
-      <span class="text-uppercase-label font-700" id="picker-page-title">Pilih Target Karyawan</span>
-      <span class="badge-status-work" id="picker-page-badge">HR SELECTION</span>
+    <div class="sheet-section-title mb-2">
+      <div>
+        <span class="text-uppercase-label font-700" id="picker-page-title">Pilih Target Karyawan</span>
+        <small class="instruction-note" id="picker-page-subtitle" style="margin-top:2px;">Sentuh nama untuk memilih</small>
+      </div>
+      <span class="badge-status-work" id="picker-page-badge">HR ENGINE</span>
     </div>
-    <small class="instruction-note mb-2" id="picker-page-subtitle">Pilih staf yang ingin dilihat absensinya atau diproses datanya</small>
 
-    <div class="form-group mt-1 mb-2">
-      <input type="text" id="picker-search-input" placeholder="Ketik nama karyawan atau divisi..." onkeyup="filterEmployeePickerPageList()" autocomplete="off">
+    <div class="form-group mb-2">
+      <input type="text" id="picker-search-input" placeholder="Cari nama karyawan atau role..." onkeyup="filterEmployeePickerPageList()" autocomplete="off">
     </div>
 
     <div id="employee-picker-page-list" class="picker-full-scroll-list">
@@ -288,45 +362,151 @@
   </div>
 </div>
 
-<!-- 8. SUB-PAGE: ARSIP SLIP -->
-<div id="tab-salary-history-page" class="tab-content hidden">
+<!-- 10. LAMAN PENUH SCANNER QR OPERASIONAL -->
+<div id="tab-gm-scanner-page" class="tab-content hidden">
+  <div class="card text-center mb-2" style="padding: 1.25rem 1rem;">
+    <div class="sheet-section-title mb-2">
+      <div>
+        <span class="text-uppercase-label font-700">Scanner QR Operasional</span>
+        <small class="instruction-note" style="margin-top:2px;">Arahkan kamera ke QR Code transaksi</small>
+      </div>
+      <span class="badge-status-work">GM & IT</span>
+    </div>
+
+    <div id="scanner-camera-container" class="scanner-viewport-wrapper mb-3">
+      <div id="reader"></div>
+      <div class="scanner-frame-overlay">
+        <div class="scanner-corner corner-tl"></div>
+        <div class="scanner-corner corner-tr"></div>
+        <div class="scanner-corner corner-bl"></div>
+        <div class="scanner-corner corner-br"></div>
+        <div class="scanner-laser-bar"></div>
+      </div>
+    </div>
+
+    <div id="scanner-waiting-screen" class="scanner-waiting-box mb-3 hidden">
+      <div class="ios-spinner"></div>
+      <strong style="font-size:0.85rem; color:var(--text-primary);">Memvalidasi Barcode...</strong>
+      <small class="instruction-note">Menghubungkan ke sistem otorisasi GM/IT</small>
+    </div>
+
+    <div class="form-group text-left mb-3">
+      <label>ATAU INPUT KODE TRANSAKSI MANUAL</label>
+      <input type="text" id="input-manual-voucher-code" placeholder="Contoh: KB-20260901-4345" style="text-transform: uppercase;">
+    </div>
+
+    <div class="grid-2 gap-sm">
+      <button type="button" class="btn-primary" onclick="validateManualVoucherCode()">
+        <span>Validasi Kode</span>
+      </button>
+      <button type="button" class="btn-secondary-line" onclick="closeGMScannerModal()">
+        <span>Tutup Kamera</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- 11. LAMAN PENUH RINCIAN PEMBAYARAN KASBON -->
+<div id="tab-kasbon-detail-page" class="tab-content hidden">
   <div class="card mb-2">
     <div class="sheet-section-title mb-2">
-      <span class="text-uppercase-label">Filter Riwayat Slip Gaji (Maks. 12 Data)</span>
-    </div>
-    <div class="grid-2 gap-sm">
-      <div class="form-group mb-0">
-        <label>PILIH TAHUN</label>
-        <select id="filter-slip-year" onchange="renderUserSlipHistory()"></select>
+      <div>
+        <span class="text-uppercase-label font-700" id="page-kasbon-employee-name">Kasbon Karyawan</span>
+        <small class="instruction-note" id="page-kasbon-code" style="margin-top:2px;">KODE: -</small>
       </div>
-      <div class="form-group mb-0">
-        <label>PILIH BULAN</label>
-        <select id="filter-slip-month" onchange="renderUserSlipHistory()">
-          <option value="all">Semua Bulan</option>
-          <option value="01">Januari</option>
-          <option value="02">Februari</option>
-          <option value="03">Maret</option>
-          <option value="04">April</option>
-          <option value="05">Mei</option>
-          <option value="06">Juni</option>
-          <option value="07">Juli</option>
-          <option value="08">Agustus</option>
-          <option value="09">September</option>
-          <option value="10">Oktober</option>
-          <option value="11">November</option>
-          <option value="12">Desember</option>
-        </select>
+      <span class="badge-completed">APPROVED</span>
+    </div>
+
+    <div class="time-stat-pill mb-2 text-left">
+      <small>TOTAL PINJAMAN POKOK</small>
+      <strong id="page-kasbon-total-amount" class="text-accent" style="font-size: 1.25rem;">Rp 0</strong>
+      <span id="page-kasbon-timestamp" class="text-muted-xs font-600 mt-1" style="display:block;">Tanggal Pengajuan: -</span>
+    </div>
+
+    <div class="grid-2 gap-sm mb-2">
+      <div class="time-stat-pill text-left">
+        <small>Sudah Terbayar</small>
+        <strong id="page-kasbon-paid" class="text-db-status" style="font-size: 1rem;">Rp 0</strong>
+      </div>
+      <div class="time-stat-pill text-left">
+        <small>Sisa Pinjaman</small>
+        <strong id="page-kasbon-remaining" class="text-danger" style="font-size: 1rem;">Rp 0</strong>
+      </div>
+    </div>
+
+    <div class="time-stat-pill mb-2 text-left">
+      <small>SKEMA ANGSURAN / POTONG GAJI</small>
+      <div class="hero-top-row mt-1">
+        <span id="page-kasbon-tenor" style="font-size: 0.78rem; font-weight: 700;">Tenor: 1 Bulan</span>
+        <span id="page-kasbon-installment" class="text-accent font-700" style="font-size: 0.78rem;">Rp 0 / bln</span>
+      </div>
+      <small class="instruction-note mt-1" id="page-kasbon-installment-progress">Progres: 0 / 1 Kali Angsuran</small>
+    </div>
+
+    <div class="time-stat-pill mb-3 text-left" style="background: var(--input-bg);">
+      <small>KETERANGAN & KEPERLUAN</small>
+      <p id="page-kasbon-note" class="instruction-note font-600 mt-1" style="color: var(--text-primary);">-</p>
+    </div>
+
+    <button type="button" class="btn-primary btn-full" onclick="closeKasbonPaymentDetailModal()">
+      <span>Kembali ke Daftar Pengajuan</span>
+    </button>
+  </div>
+</div>
+
+<!-- 12. LAMAN PENUH SERTIFIKAT KPI DIGITAL (FULL PAGE VIEW & NO OVERFLOW) -->
+<div id="tab-kpi-cert-page" class="tab-content hidden">
+  <div class="card mb-2" id="printable-cert-area" style="padding: 1.5rem 1.25rem;">
+    <div class="text-center mb-2">
+      <small class="instruction-note font-700" style="letter-spacing: 0.15em;">PERFORMANCE CERTIFICATION</small>
+      <h2 class="login-hero-title mt-1" style="font-size: 1.4rem;">My<span>aiwa</span></h2>
+      <span class="instruction-note font-700">AIWA RAGIN JAJE · EXCELLENCE EVALUATION</span>
+      <div class="login-hero-divider mt-2 mb-3"></div>
+    </div>
+
+    <p class="instruction-note text-center mb-2">Diberikan secara resmi sebagai pengakuan atas pencapaian kinerja bulanan kepada:</p>
+    
+    <div class="text-center mb-3">
+      <strong id="cert-employee-name" class="hero-user-name" style="font-size: 1.2rem; display:block;">NAMA KARYAWAN</strong>
+      <span id="cert-employee-role" class="badge-status-work mt-1">STAFF OUTLET</span>
+    </div>
+
+    <div class="grid-2 gap-sm mb-2">
+      <div class="time-stat-pill text-left">
+        <small>Total Kehadiran</small>
+        <strong id="cert-presence-val">0 Hari</strong>
+      </div>
+      <div class="time-stat-pill text-left">
+        <small>Kepatuhan SOP</small>
+        <strong id="cert-task-val">0%</strong>
+      </div>
+    </div>
+
+    <div class="time-stat-pill text-left mb-2">
+      <small>Indeks Prestasi KPI</small>
+      <strong id="cert-score-val" class="text-accent font-800" style="font-size: 1.15rem;">0%</strong>
+    </div>
+
+    <div class="text-center mb-3">
+      <span id="cert-status-badge" class="badge-status-work text-db-status font-700" style="font-size:0.75rem; padding: 5px 12px;">
+        PRESTASI MEMUASKAN
+      </span>
+    </div>
+
+    <div class="payslip-signature-box mt-3 text-left">
+      <div class="sig-col">
+        <small>Digital Verification Code:</small>
+        <p id="cert-verification-code" class="corp-doc-code font-700" style="margin-top:2px;">CERT-2026-08-AIWA</p>
+      </div>
+      <div class="sig-col text-right">
+        <small>Disahkan Resmi Oleh:</small>
+        <strong>General Manager</strong>
       </div>
     </div>
   </div>
 
-  <div class="card">
-    <div class="sheet-section-title mb-2">
-      <span class="text-uppercase-label">Daftar Arsip Slip Gaji</span>
-      <span id="history-total-count" class="badge-status-work">0 / 12 Dokumen</span>
-    </div>
-    <div id="user-slip-history-list" class="product-scroll-list max-h-280">
-      <p class="placeholder-text">Memuat arsip slip gaji...</p>
-    </div>
+  <div class="grid-2 gap-sm no-print">
+    <button type="button" class="btn-primary" onclick="printKPICertificate()">Cetak / PDF</button>
+    <button type="button" class="btn-secondary-line" onclick="closeKPICertModal()">Kembali</button>
   </div>
 </div>

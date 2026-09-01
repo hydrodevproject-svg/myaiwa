@@ -17,6 +17,7 @@ import {
   ROLE_DISPLAY_NAMES, 
   DEFAULT_ROLE_PARAMS, 
   DEFAULT_STAFF_WEEKLY_ROSTER,
+  PAYROLL_TERMS,
   state 
 } from "./constants.js";
 
@@ -158,7 +159,7 @@ export async function saveAssignedShift(e) {
     payload.work_mode = "flexible";
   }
 
-  showLoading("Menyimpan konfigurasi shift...");
+  showLoading();
   try {
     await setDoc(doc(db, "users", userId), payload, { merge: true });
 
@@ -198,7 +199,7 @@ export async function loadCareerPathList() {
   const container = document.getElementById("career-path-list-container");
   if (!container) return;
 
-  showLoading("Memuat data jenjang karir...");
+  showLoading();
   try {
     if (!state.allEmployeesCache || state.allEmployeesCache.length === 0) {
       await loadHRUserOptions();
@@ -226,12 +227,13 @@ export function renderCareerPathList(list) {
     const displayRole = (ROLE_DISPLAY_NAMES[rawRole] || rawRole).toUpperCase();
     const careerLevel = item.career_level || "Junior";
     const customAllowance = item.custom_allowance ? `Rp ${Number(item.custom_allowance).toLocaleString('id-ID')}` : "Default Role";
+    const terminLabel = item.payroll_term === "termin_2" ? "Termin 2 (Tgl 15)" : "Termin 1 (Tgl 1)";
 
     return `
       <div class="picker-user-row clean-tap-row" onclick="openCareerPromotionForm('${item.id}', '${(item.nama || item.email).replace(/'/g, "\\'")}', '${careerLevel}', ${item.custom_allowance || 0})">
         <div class="picker-user-meta">
           <strong>${item.nama || item.email} [${displayRole}]</strong>
-          <small>Level: <b style="color:var(--text-accent);">${careerLevel}</b> · Tunjangan: ${customAllowance}</small>
+          <small>Level: <b style="color:var(--text-accent);">${careerLevel}</b> · ${customAllowance} · <span class="badge-status-work" style="padding:1px 4px; font-size:0.55rem;">${terminLabel}</span></small>
         </div>
       </div>
     `;
@@ -285,7 +287,7 @@ export function onCareerLevelPresetChange() {
 export async function saveCareerPromotion(userId, newLevel, customAllowance) {
   if (!userId) return notify("Perhatian", "Pilih karyawan terlebih dahulu.");
 
-  showLoading("Menerapkan promosi jenjang karir...");
+  showLoading();
   try {
     await setDoc(doc(db, "users", userId), {
       career_level: newLevel,
@@ -304,25 +306,37 @@ export async function saveCareerPromotion(userId, newLevel, customAllowance) {
 }
 
 // ==========================================
-// 3. STRUKTUR GAJI & REKENING RESMI
+// 3. STRUKTUR GAJI & TERMIN PENGGAJIAN
 // ==========================================
-export async function saveSalaryStructure(userId, baseSalary, mealAllowanceDaily, bankName, bankNumber, bankHolder) {
+export async function saveSalaryStructure(userId, baseSalary, mealAllowanceDaily, bankName, bankNumber, bankHolder, payrollTerm = "termin_1") {
   if (!userId) return notify("Perhatian", "Pilih karyawan terlebih dahulu.");
 
-  showLoading("Menyimpan struktur gaji...");
+  showLoading();
   try {
-    await setDoc(doc(db, "salary_structures", userId), {
+    const payload = {
       uid: userId,
       base_salary: Number(baseSalary || 0),
       meal_allowance_daily: Number(mealAllowanceDaily || 0),
+      payroll_term: payrollTerm || "termin_1",
       bank_name: bankName || "BCA",
       bank_number: String(bankNumber || "").trim(),
       bank_holder: String(bankHolder || "").trim(),
+      bank_account: `${bankName || "BCA"} - ${String(bankNumber || "").trim()} a.n ${String(bankHolder || "").trim()}`,
       updated_at: serverTimestamp()
+    };
+
+    await setDoc(doc(db, "salary_structures", userId), payload, { merge: true });
+
+    await setDoc(doc(db, "users", userId), {
+      payroll_term: payrollTerm || "termin_1"
     }, { merge: true });
 
+    const cached = state.allEmployeesCache.find(u => u.id === userId);
+    if (cached) cached.payroll_term = payrollTerm;
+
     hideLoading();
-    notify("Berhasil", "Struktur gaji dan data rekening resmi berhasil disimpan.");
+    const termLabel = payrollTerm === "termin_2" ? "Termin 2 (Tanggal 15)" : "Termin 1 (Tanggal 1)";
+    notify("Berhasil", `Struktur gaji dan jadwal ${termLabel} berhasil disimpan.`);
   } catch (e) {
     hideLoading();
     notify("Gagal", e.message);
@@ -332,8 +346,14 @@ export async function saveSalaryStructure(userId, baseSalary, mealAllowanceDaily
 // ==========================================
 // 4. EMPLOYEE PICKER SUB-PAGE HANDLER
 // ==========================================
-export function navigateToEmployeePickerPage(context) {
+export async function navigateToEmployeePickerPage(context) {
   state.activePickerContext = context;
+
+  if (!state.allEmployeesCache || state.allEmployeesCache.length === 0) {
+    showLoading();
+    await loadHRUserOptions();
+    hideLoading();
+  }
 
   const titleEl = document.getElementById("picker-page-title");
   const subEl = document.getElementById("picker-page-subtitle");
@@ -356,8 +376,8 @@ export function navigateToEmployeePickerPage(context) {
     if (badgeEl) badgeEl.innerText = "JADWAL";
   } else if (context === 'salary') {
     if (titleEl) titleEl.innerText = "Pilih Karyawan Payroll";
-    if (subEl) subEl.innerText = "Atur struktur gaji dan data rekening bank";
-    if (badgeEl) badgeEl.innerText = "GAJI";
+    if (subEl) subEl.innerText = "Atur struktur gaji, rekening, dan termin penggajian";
+    if (badgeEl) badgeEl.innerText = "GAJI & TERMIN";
   } else if (context === 'task') {
     if (titleEl) titleEl.innerText = "Pilih Karyawan Penugasan";
     if (subEl) subEl.innerText = "Delegasikan tugas operasional khusus";
@@ -398,12 +418,13 @@ export function renderEmployeePickerItems(list) {
   list.forEach(u => {
     const rawRole = String(u.role || 'staff').toLowerCase();
     const roleLabel = (ROLE_DISPLAY_NAMES[rawRole] || rawRole).toUpperCase();
+    const termLabel = u.payroll_term === "termin_2" ? "Termin 2 (Tgl 15)" : "Termin 1 (Tgl 1)";
     const div = document.createElement("div");
     div.className = "picker-user-row clean-tap-row";
     div.innerHTML = `
       <div class="picker-user-meta">
         <strong>${u.nama || u.email}</strong>
-        <small>${u.email || '-'} · ${roleLabel}</small>
+        <small>${u.email || '-'} · ${roleLabel} · <b style="color:var(--text-accent);">${termLabel}</b></small>
       </div>
     `;
     div.onclick = () => selectEmployeeFromPicker(u.id, u.nama || u.email, u);
@@ -466,9 +487,12 @@ export function selectEmployeeFromPicker(userId, userName, userObj) {
         const d = snap.data();
         document.getElementById("sal-base").value = d.base_salary || "";
         document.getElementById("sal-meal-daily").value = d.meal_allowance_daily || 15000;
+        document.getElementById("sal-payroll-term").value = d.payroll_term || userObj?.payroll_term || "termin_1";
         document.getElementById("sal-bank-name").value = d.bank_name || "BCA";
         document.getElementById("sal-bank-number").value = d.bank_number || "";
         document.getElementById("sal-bank-holder").value = d.bank_holder || "";
+      } else {
+        document.getElementById("sal-payroll-term").value = userObj?.payroll_term || "termin_1";
       }
     });
 
@@ -485,7 +509,7 @@ export function selectEmployeeFromPicker(userId, userName, userObj) {
 }
 
 // ==========================================
-// 5. PARAMETER ROLE TOKO (DENGAN HANDLER KUSTOM)
+// 5. PARAMETER ROLE TOKO
 // ==========================================
 export function openRoleParameterPage(roleKey, roleTitle, pushState = true) {
   if (pushState) {
@@ -550,7 +574,7 @@ export async function handleSaveRoleParameters(e) {
     updated_at: serverTimestamp()
   };
 
-  showLoading(`Menyimpan parameter role ${roleKey.toUpperCase()}...`);
+  showLoading();
   try {
     await setDoc(doc(db, "app_settings", "parameters_roles"), {
       [roleKey]: payload

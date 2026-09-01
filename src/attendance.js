@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MYAIWA - GPS ATTENDANCE, REALTIME ATTENDANCE OBSERVER & EARLY CHECK-OUT
+   MYAIWA - GPS ATTENDANCE, MAPLIBRE CLEANUP & REALTIME OBSERVER
    MYAIWA - AIWA RAGIN JAJE SYSTEM
    ========================================================================== */
 
@@ -11,7 +11,7 @@ import {
   getDoc, 
   setDoc, 
   deleteDoc, 
-  onSnapshot,
+  onSnapshot, 
   serverTimestamp, 
   query, 
   where 
@@ -39,33 +39,42 @@ import {
 
 import { navigateToEmployeePickerPage } from "./hr-management.js";
 
-// Penampung unsubscribe listener realtime absensi
 let unsubscribeTodayAttendance = null;
 let unsubscribeAttendanceHistory = null;
 
+export function cleanupAttendanceListeners() {
+  if (unsubscribeTodayAttendance) {
+    unsubscribeTodayAttendance();
+    unsubscribeTodayAttendance = null;
+  }
+  if (unsubscribeAttendanceHistory) {
+    unsubscribeAttendanceHistory();
+    unsubscribeAttendanceHistory = null;
+  }
+}
+
 // ==========================================
-// 1. TILE STYLE MAPLIBRE (STABIL & CEPAT)
+// 1. TILE STYLE OPEN-SOURCE BEBAS API KEY
 // ==========================================
+const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/bright';
+
 const FAST_LIGHT_MAP_STYLE = {
   version: 8,
   sources: {
-    'raster-tiles': {
+    'osm-tiles': {
       type: 'raster',
       tiles: [
-        'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-        'https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-        'https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
         'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
       ],
       tileSize: 256,
-      attribution: '© CARTO © OpenStreetMap'
+      attribution: '© OpenStreetMap contributors'
     }
   },
   layers: [
     {
-      id: 'raster-layer',
+      id: 'osm-layer',
       type: 'raster',
-      source: 'raster-tiles',
+      source: 'osm-tiles',
       minzoom: 0,
       maxzoom: 19
     }
@@ -218,15 +227,26 @@ export function validateUserPositionAndSchedule(userLat, userLng, accuracyMeters
 }
 
 // ==========================================
-// 4. INISIALISASI PETA MAPLIBRE DENGAN RESIZE
+// 4. INISIALISASI & CLEANUP PETA MAPLIBRE
 // ==========================================
+export function cleanupMapLibre() {
+  if (state.userMarker) {
+    state.userMarker.remove();
+    state.userMarker = null;
+  }
+  if (state.maplibreMap) {
+    state.maplibreMap.remove();
+    state.maplibreMap = null;
+  }
+}
+
 export function initMapLibre() {
   const mapContainer = document.getElementById("maplibre-view");
   if (!mapContainer || !window.maplibregl) return;
 
   if (state.maplibreMap) {
     setTimeout(() => {
-      state.maplibreMap.resize();
+      if (state.maplibreMap) state.maplibreMap.resize();
     }, 150);
     return;
   }
@@ -234,7 +254,7 @@ export function initMapLibre() {
   try {
     state.maplibreMap = new maplibregl.Map({
       container: 'maplibre-view',
-      style: FAST_LIGHT_MAP_STYLE,
+      style: MAP_STYLE_URL,
       center: [MERCHANT_LOCATION.lng, MERCHANT_LOCATION.lat],
       zoom: 16.5,
       pitchWithRotate: false,
@@ -243,13 +263,19 @@ export function initMapLibre() {
       attributionControl: false
     });
 
+    state.maplibreMap.on('error', (e) => {
+      if (e && e.error && (e.error.status === 403 || e.error.status === 401)) {
+        state.maplibreMap.setStyle(FAST_LIGHT_MAP_STYLE);
+      }
+    });
+
     new maplibregl.Marker({ color: '#1A4B8B' })
       .setLngLat([MERCHANT_LOCATION.lng, MERCHANT_LOCATION.lat])
       .setPopup(new maplibregl.Popup().setHTML("<b>AIWA RAGIN JAJE</b><br>Jl. Pendidikan No.28, Aikmel"))
       .addTo(state.maplibreMap);
 
     state.maplibreMap.on('load', () => {
-      state.maplibreMap.resize();
+      if (state.maplibreMap) state.maplibreMap.resize();
     });
 
     setTimeout(() => {
@@ -284,14 +310,22 @@ export function getGPSLocation(isSilent = false) {
 
   navigator.geolocation.getCurrentPosition(
     (pos) => {
-      state.userGPSLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      state.userGPSLocation = { 
+        lat: pos.coords.latitude, 
+        lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy || 0 
+      };
       validateUserPositionAndSchedule(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
       resetGPSButtonState();
     },
     () => {
       navigator.geolocation.getCurrentPosition(
         (fallbackPos) => {
-          state.userGPSLocation = { lat: fallbackPos.coords.latitude, lng: fallbackPos.coords.longitude };
+          state.userGPSLocation = { 
+            lat: fallbackPos.coords.latitude, 
+            lng: fallbackPos.coords.longitude,
+            accuracy: fallbackPos.coords.accuracy || 0 
+          };
           validateUserPositionAndSchedule(fallbackPos.coords.latitude, fallbackPos.coords.longitude, fallbackPos.coords.accuracy);
           resetGPSButtonState();
         },
@@ -343,7 +377,9 @@ export async function executeGPSAttendance() {
 
   const roleCfg = state.roleParamsCache[rawRole] || DEFAULT_ROLE_PARAMS[rawRole] || DEFAULT_ROLE_PARAMS.staff;
   const maxRadiusAllowed = roleCfg.radius_meter || MERCHANT_LOCATION.maxRadiusMeters;
-  const distance = calculateDistance(state.userGPSLocation.lat, state.userGPSLocation.lng, MERCHANT_LOCATION.lat, MERCHANT_LOCATION.lng);
+  const accuracyMeters = state.userGPSLocation.accuracy || 0;
+  const rawDistance = calculateDistance(state.userGPSLocation.lat, state.userGPSLocation.lng, MERCHANT_LOCATION.lat, MERCHANT_LOCATION.lng);
+  const distance = Math.max(0, rawDistance - (accuracyMeters / 2));
   const isInsideOutlet = distance <= maxRadiusAllowed;
   const isITAccount = (rawRole === "it");
 
@@ -367,8 +403,7 @@ export async function executeGPSAttendance() {
     const existingSnap = await getDoc(docRef);
 
     if (!existingSnap.exists()) {
-      // CHECK-IN
-      showLoading("Memproses check-in...");
+      showLoading();
       await setDoc(docRef, {
         uid: user.uid,
         nama: document.getElementById("header-user-name")?.innerText || state.currentUserData?.nama || user.email,
@@ -385,7 +420,6 @@ export async function executeGPSAttendance() {
       hideLoading();
       notify("Sukses", `Check-In berhasil [Shift: ${activeShift.toUpperCase()} · Mode: ${recordedMode.toUpperCase()}] pukul ${timeStr}`);
     } else {
-      // CHECK-OUT
       const data = existingSnap.data();
       if (data.check_in_time && data.check_out_time) {
         return notify("Selesai", "Anda sudah menyelesaikan presensi Check-In dan Check-Out untuk hari ini.");
@@ -394,7 +428,6 @@ export async function executeGPSAttendance() {
       let officialEndTime = (activeShift === "malam") ? (roleCfg.malam_end || "21:00") : (roleCfg.pagi_end || "15:30");
       if (activeShift === "it_flex") officialEndTime = "18:00";
 
-      // Interceptor jika pulang sebelum jam berakhir
       if (timeStr < officialEndTime) {
         const confirmEarly = await showCustomConfirm(
           "Pulang Sebelum Jam Selesai",
@@ -409,8 +442,7 @@ export async function executeGPSAttendance() {
         }
       }
 
-      // Check-out normal
-      showLoading("Memproses check-out...");
+      showLoading();
       await setDoc(docRef, {
         check_out_time: timeStr,
         check_out_gps: state.userGPSLocation,
@@ -461,7 +493,7 @@ export async function submitEarlyLeaveRequest(e) {
 
   if (!reason) return notify("Perhatian", "Tuliskan alasan kepulangan lebih awal.");
 
-  showLoading("Menyimpan pengajuan pulang awal...");
+  showLoading();
   const todayStr = getLocalDateWITA();
   const docUniqueId = `${user.uid}_${todayStr}`;
 
@@ -495,7 +527,7 @@ export async function submitEarlyLeaveRequest(e) {
 }
 
 // ==========================================
-// 8. REALTIME OBSERVER PRESENSI HARI INI & RIWAYAT
+// 8. REALTIME OBSERVER PRESENSI HARI INI
 // ==========================================
 export function checkTodayAttendance() {
   const user = auth.currentUser;
@@ -511,13 +543,11 @@ export function checkTodayAttendance() {
     badgeShiftMode.innerText = isDayOff ? "LIBUR MINGGUAN" : `SHIFT ${activeShift.toUpperCase()} · MODE ${activeMode.toUpperCase()}`;
   }
 
-  // Bersihkan listener lama jika ada
   if (unsubscribeTodayAttendance) unsubscribeTodayAttendance();
 
   const docUniqueId = `${user.uid}_${todayStr}`;
   const docRef = doc(db, "attendance", docUniqueId);
 
-  // Pasang Listener Real-time
   unsubscribeTodayAttendance = onSnapshot(docRef, (docSnap) => {
     if (docSnap.exists()) {
       const data = docSnap.data();
@@ -538,7 +568,6 @@ export function checkTodayAttendance() {
         updateHomeLiveStatus(false, true);
       }
     } else {
-      // DOKUMEN DIHAPUS OLEH GM/IT -> RESET OTOMATIS SECARA REAL-TIME
       if (checkinEl) checkinEl.innerText = "--:--";
       if (checkoutEl) checkoutEl.innerText = "--:--";
       if (btnAbsen) {
@@ -613,17 +642,63 @@ export function loadAttendanceHistory() {
       const div = document.createElement("div");
       div.className = "picker-user-row";
       div.style.cursor = "default";
+      div.style.marginBottom = "6px";
+
+      const rawRole = String(item.role || state.currentUserData?.role || 'staff').toLowerCase();
+      const roleCfg = state.roleParamsCache[rawRole] || DEFAULT_ROLE_PARAMS[rawRole] || DEFAULT_ROLE_PARAMS.staff;
+      const itemShift = item.shift || "pagi";
+
+      let baseStart = roleCfg.pagi_start || "07:30";
+      if (itemShift === "malam") baseStart = roleCfg.malam_start || "13:30";
+      if (itemShift === "it_flex") baseStart = roleCfg.it_threshold || "10:00";
+
+      const lateThreshold = calculateLateThresholdTime(baseStart, roleCfg.tolerance !== undefined ? roleCfg.tolerance : 15);
+      const isLate = (item.status === "Hadir" && item.check_in_time && item.check_in_time > lateThreshold);
+
+      let badgeLabel = item.status || "Hadir";
+      let badgeBg = "rgba(16, 185, 129, 0.12)";
+      let badgeColor = "#10b981";
+
+      if (item.status === "Hadir") {
+        if (item.early_leave_type === "Sakit") {
+          badgeLabel = "Hadir - Sakit";
+          badgeBg = "rgba(239, 68, 68, 0.15)";
+          badgeColor = "#ef4444";
+        } else if (item.early_leave_type === "Izin") {
+          badgeLabel = "Hadir - Izin";
+          badgeBg = "rgba(245, 158, 11, 0.15)";
+          badgeColor = "#f59e0b";
+        } else if (isLate) {
+          badgeLabel = "Hadir Terlambat";
+          badgeBg = "rgba(245, 158, 11, 0.15)";
+          badgeColor = "#f59e0b";
+        }
+      } else if (item.status === "Izin") {
+        badgeLabel = "Izin";
+        badgeBg = "rgba(59, 130, 246, 0.12)";
+        badgeColor = "#3b82f6";
+      } else if (item.status === "Sakit") {
+        badgeLabel = "Sakit";
+        badgeBg = "rgba(239, 68, 68, 0.15)";
+        badgeColor = "#ef4444";
+      } else if (item.status === "Alpa") {
+        badgeLabel = "Alpa";
+        badgeBg = "rgba(239, 68, 68, 0.15)";
+        badgeColor = "#ef4444";
+      }
+
       const earlyInfo = item.early_leave_type ? ` · Pulang Awal (${item.early_leave_type})` : '';
+
       div.innerHTML = `
         <div class="picker-user-meta">
           <strong>${item.date} [${(item.mode || 'wfo').toUpperCase()}]</strong>
           <small>Shift: ${(item.shift || 'PAGI').toUpperCase()} | Masuk: ${item.check_in_time || '-'} | Keluar: ${item.check_out_time || '-'}${earlyInfo}</small>
         </div>
-        <span class='badge-status-work' style='background:rgba(16, 185, 129, 0.12); color:#10b981;'>${item.status || 'Hadir'}</span>
+        <span class='badge-status-work' style='background:${badgeBg}; color:${badgeColor}; font-weight:800; font-size:0.62rem; flex-shrink:0;'>${badgeLabel}</span>
       `;
       listEl.appendChild(div);
     });
-  }, (err) => {
+  }, () => {
     listEl.innerHTML = "<p class='placeholder-text' style='color:#ef4444;'>Gagal memuat riwayat.</p>";
   });
 }
@@ -697,7 +772,7 @@ export async function generateAdminAttendanceReport() {
   const container = document.getElementById("admin-attendance-report-results");
   if (!container) return;
 
-  showLoading("Mengambil laporan absensi...");
+  showLoading();
 
   try {
     let q;
@@ -924,7 +999,7 @@ export async function saveManualAttendance(e) {
   const employeeRole = emp ? String(emp.role || 'staff').toLowerCase() : "staff";
   const docUniqueId = `${uid}_${dateStr}`;
 
-  showLoading("Menyimpan absensi manual...");
+  showLoading();
 
   try {
     await setDoc(doc(db, "attendance", docUniqueId), {
@@ -989,7 +1064,7 @@ export async function saveEditedAttendance(e) {
 
   if (!docId) return notify("Error", "ID Dokumen tidak ditemukan.");
 
-  showLoading("Menyimpan koreksi...");
+  showLoading();
 
   try {
     await setDoc(doc(db, "attendance", docId), {
@@ -1016,7 +1091,7 @@ export async function deleteAttendanceRecord(docId, uid) {
   const isConfirmed = await showCustomConfirm("Hapus Absensi", "Hapus data absensi ini secara permanen? KPI bulanan karyawan akan langsung dikalkulasi ulang.");
   if (!isConfirmed) return;
 
-  showLoading("Menghapus data absensi...");
+  showLoading();
   try {
     await deleteDoc(doc(db, "attendance", docId));
     if (uid && window.calculateUserKPI) await window.calculateUserKPI(uid);
@@ -1060,14 +1135,27 @@ export function calculateLeaveDays() {
   if (durationDisplay) durationDisplay.value = `${diffDays} Hari`;
 }
 
-export async function submitLeaveRequest(startDate, endDate, duration, reason) {
+export async function submitLeaveRequest(startDate, endDate, duration, reason, file = null) {
   const user = auth.currentUser;
   if (!user) return;
 
-  showLoading("Mengirimkan pengajuan...");
+  showLoading();
   const docUniqueId = `${user.uid}_${startDate}`;
 
   try {
+    let fileBase64 = null;
+    let fileName = null;
+
+    if (file) {
+      fileName = file.name;
+      fileBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
     await setDoc(doc(db, "attendance", docUniqueId), {
       uid: user.uid,
       nama: document.getElementById("header-user-name")?.innerText || state.currentUserData?.nama || user.email,
@@ -1077,6 +1165,8 @@ export async function submitLeaveRequest(startDate, endDate, duration, reason) {
       duration: duration,
       status: state.pendingLeaveType,
       keterangan: reason,
+      attachment_name: fileName,
+      attachment_data: fileBase64,
       timestamp: serverTimestamp()
     }, { merge: true });
 

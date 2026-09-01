@@ -1,24 +1,153 @@
-<div id="tab-gaji" class="tab-content hidden">
-  <div class="card mb-2">
-    <div class="sheet-section-title mb-2">
-      <span class="text-uppercase-label">Layanan Gaji Karyawan</span>
-    </div>
-    <div class="hr-icons-grid">
-      <div class="hr-icon-card" onclick="openMyCurrentPayslip()">
-        <div class="hr-icon-bubble bg-soft-mint">
-          <svg class="icon-inline" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-        </div>
-        <strong>Slip Gaji</strong>
-        <small>Bulan Berjalan</small>
-      </div>
+<!-- ==========================================================================
+     VIEWS/TAB-GAJI.HTML - MODUL FINANCE (MENU GRID & SUB-PAGES)
+     MYAIWA - AIWA RAGIN JAJE SYSTEM
+     ========================================================================== -->
 
-      <div class="hr-icon-card" onclick="navigateToTab('salary-history-page')">
-        <div class="hr-icon-bubble bg-soft-purple">
-          <svg class="icon-inline" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+<div id="tab-gaji" class="tab-content hidden">
+
+  <!-- 1. GRID MENU UTAMA FINANCE -->
+  <div id="finance-menu-grid-view">
+    <div class="card mb-2">
+      <div class="sheet-section-title mb-2">
+        <span class="text-uppercase-label font-700">Layanan Keuangan & Payroll</span>
+        <span class="badge-status-work">FINANCE DESK</span>
+      </div>
+      
+      <div class="hr-icons-grid">
+        <!-- ICON 1: KASBON KARYAWAN -->
+        <div class="hr-icon-card" onclick="openFinanceSubPage('finance-kasbon')">
+          <div class="hr-icon-bubble bg-soft-amber">
+            <svg class="icon-inline" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </div>
+          <strong>Kasbon</strong>
+          <small>Pinjam & Setor</small>
         </div>
-        <strong>Riwayat Slip</strong>
-        <small>Maks 12 Arsip</small>
+
+        <!-- ICON 2: SLIP GAJI BULAN BERJALAN -->
+        <div class="hr-icon-card" onclick="openMyCurrentPayslip()">
+          <div class="hr-icon-bubble bg-soft-mint">
+            <svg class="icon-inline" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+              <line x1="12" y1="8" x2="12" y2="16"></line>
+              <line x1="8" y1="12" x2="16" y2="12"></line>
+            </svg>
+          </div>
+          <strong>Slip Gaji</strong>
+          <small>Bulan Berjalan</small>
+        </div>
+
+        <!-- ICON 3: RIWAYAT ARSIP SLIP -->
+        <div class="hr-icon-card" onclick="navigateToTab('salary-history-page')">
+          <div class="hr-icon-bubble bg-soft-purple">
+            <svg class="icon-inline" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+          </div>
+          <strong>Arsip Slip</strong>
+          <small>Riwayat Bulanan</small>
+        </div>
       </div>
     </div>
   </div>
+
+  <!-- 2. DETAIL SUB-PAGE KASBON -->
+  <div id="finance-subpage-detail-view" class="hidden">
+    <div id="subtab-finance-kasbon" class="sub-tab-content">
+      
+      <!-- HERO CARD KASBON -->
+      <div class="card kasbon-hero-gradient-card mb-2">
+        <div class="sheet-section-title mb-1">
+          <span class="text-uppercase-label font-700" style="color: #10b981;">SALDO PINJAMAN KASBON</span>
+          <span class="badge-status-work" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">AKTIF</span>
+        </div>
+
+        <small class="instruction-note" style="margin-top: 0;">SISA KASBON SAAT INI</small>
+        <strong id="kasbon-current-balance-display" class="kasbon-main-amount">Rp 0</strong>
+
+        <div class="grid-2 gap-sm mt-2 mb-3">
+          <div class="time-stat-pill text-left kasbon-stat-pill">
+            <small>Total Pernah Diajukan</small>
+            <strong id="kasbon-total-borrowed-display">Rp 0</strong>
+          </div>
+          <div class="time-stat-pill text-left kasbon-stat-pill">
+            <small>Sudah Dilunasi / Dipotong</small>
+            <strong id="kasbon-total-repaid-display" class="text-db-status">Rp 0</strong>
+          </div>
+        </div>
+
+        <!-- TOMBOL AKSI KASBON -->
+        <div class="grid-2 gap-sm">
+          <button type="button" class="btn-primary" onclick="openKasbonForm('pinjam')">
+            <span>Ajukan Kasbon</span>
+          </button>
+
+          <button type="button" class="btn-kasbon-dark" onclick="openKasbonForm('bayar')">
+            <span>Setor Kasbon</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- FORMULIR PENGAJUAN PINJAM / SETOR KASBON -->
+      <div id="box-form-kasbon" class="card mb-2 hidden">
+        <div class="sheet-section-title mb-2">
+          <span class="text-uppercase-label font-700" id="kasbon-form-title">Formulir Pengajuan Kasbon</span>
+          <span class="badge-status-work" id="kasbon-form-badge">TRANSAKSI</span>
+        </div>
+
+        <form id="form-transaksi-kasbon">
+          <input type="hidden" id="kasbon-action-type" value="pinjam">
+
+          <div class="form-group mb-2">
+            <label id="kasbon-amount-label">NOMINAL PINJAMAN (RP)</label>
+            <input type="number" id="kasbon-amount-input" required min="10000" placeholder="Contoh: 500000" oninput="calculateKasbonInstallment()">
+          </div>
+
+          <div id="box-kasbon-tenor-wrapper" class="grid-2 gap-sm mb-2">
+            <div class="form-group mb-0">
+              <label>PILIHAN TENOR</label>
+              <select id="kasbon-tenor-months" onchange="calculateKasbonInstallment()">
+                <option value="1">1 Bulan (Lunas Langsung)</option>
+                <option value="2">2 Bulan (2x Potong Gaji)</option>
+                <option value="3">3 Bulan (3x Potong Gaji)</option>
+              </select>
+            </div>
+            <div class="form-group mb-0">
+              <label>CICILAN / BULAN (RP)</label>
+              <input type="text" id="kasbon-monthly-installment" class="readonly-display" readonly value="Rp 0">
+            </div>
+          </div>
+
+          <div class="form-group mb-3">
+            <label>KEPERLUAN / KETERANGAN</label>
+            <textarea id="kasbon-notes-input" class="custom-textarea" rows="2" required placeholder="Tuliskan keterangan keperluan..."></textarea>
+          </div>
+
+          <div class="grid-2 gap-sm mt-3">
+            <button type="submit" id="btn-submit-kasbon-form" class="btn-primary">Kirimkan Pengajuan</button>
+            <button type="button" class="btn-secondary-line" onclick="closeKasbonForm()">Batal</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- RIWAYAT & MUTASI KASBON AKUN -->
+      <div class="card">
+        <div class="sheet-section-title mb-2">
+          <span class="text-uppercase-label font-700">Riwayat & Mutasi Kasbon Akun</span>
+        </div>
+
+        <div id="kasbon-history-list" class="picker-list-scroll max-h-280">
+          <p class="placeholder-text">Belum ada transaksi kasbon aktif.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
 </div>

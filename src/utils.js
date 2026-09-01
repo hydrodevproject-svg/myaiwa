@@ -1,9 +1,10 @@
 /* ==========================================================================
-   SRC/UTILS.JS - UTILITIES, UI HELPERS, HARDWARE BACK & NAVIGATION (LENGKAP)
+   SRC/UTILS.JS - UTILITIES, UI HELPERS & HIERARCHICAL DEVICE BACK SYSTEM
    MYAIWA - AIWA RAGIN JAJE SYSTEM
    ========================================================================== */
 
 import { state } from "./constants.js";
+import { auth } from "../firebase-config.js";
 
 // ==========================================
 // 1. ZONA WAKTU WITA & JAM REALTIME
@@ -47,16 +48,20 @@ export function initLiveClock() {
 }
 
 // ==========================================
-// 2. LOADING STATE HANDLER (MINIMALIS & RINGAN)
+// 2. LOADING STATE HANDLER
 // ==========================================
 export function showLoading() {
   const overlay = document.getElementById("loading-overlay");
+  const loader = document.getElementById("global-loader");
   if (overlay) overlay.classList.remove("hidden");
+  if (loader) loader.classList.remove("hidden");
 }
 
 export function hideLoading() {
   const overlay = document.getElementById("loading-overlay");
+  const loader = document.getElementById("global-loader");
   if (overlay) overlay.classList.add("hidden");
+  if (loader) loader.classList.add("hidden");
 }
 
 // ==========================================
@@ -72,24 +77,13 @@ export function notify(title, msg) {
     msgEl.innerText = msg || "";
     modal.classList.remove("hidden");
   } else {
-    // Fallback jika menggunakan modal baru atau alert
-    const customOverlay = document.getElementById("custom-modal-overlay");
-    if (customOverlay) {
-      document.getElementById("custom-modal-title").innerText = title || "Notifikasi";
-      document.getElementById("custom-modal-message").innerText = msg || "";
-      document.getElementById("btn-modal-cancel")?.classList.add("hidden");
-      const okBtn = document.getElementById("btn-modal-confirm");
-      if (okBtn) okBtn.onclick = () => customOverlay.classList.add("hidden");
-      customOverlay.classList.remove("hidden");
-    } else {
-      alert(`${title}: ${msg}`);
-    }
+    alert(`${title}: ${msg}`);
   }
 }
 
 export function closeModal() {
   document.getElementById("custom-modal")?.classList.add("hidden");
-  document.getElementById("custom-modal-overlay")?.classList.add("hidden");
+  document.getElementById("confirm-modal")?.classList.add("hidden");
 }
 
 export function closeCropModal() {
@@ -105,7 +99,6 @@ export function updateFileName(input, labelId) {
 
 export function showCustomConfirm(title, msg) {
   return new Promise((resolve) => {
-    // 1. Cek confirm modal lama
     const modal = document.getElementById("confirm-modal");
     if (modal) {
       const titleEl = document.getElementById("confirm-modal-title");
@@ -125,31 +118,6 @@ export function showCustomConfirm(title, msg) {
 
       if (yesBtn) yesBtn.onclick = () => { cleanup(); resolve(true); };
       if (noBtn) noBtn.onclick = () => { cleanup(); resolve(false); };
-      return;
-    }
-
-    // 2. Cek custom-modal-overlay baru
-    const customOverlay = document.getElementById("custom-modal-overlay");
-    if (customOverlay) {
-      document.getElementById("custom-modal-title").innerText = title || "Konfirmasi";
-      document.getElementById("custom-modal-message").innerText = msg || "";
-      const cancelBtn = document.getElementById("btn-modal-cancel");
-      const okBtn = document.getElementById("btn-modal-confirm");
-
-      cancelBtn?.classList.remove("hidden");
-      if (cancelBtn) {
-        cancelBtn.onclick = () => {
-          customOverlay.classList.add("hidden");
-          resolve(false);
-        };
-      }
-      if (okBtn) {
-        okBtn.onclick = () => {
-          customOverlay.classList.add("hidden");
-          resolve(true);
-        };
-      }
-      customOverlay.classList.remove("hidden");
       return;
     }
 
@@ -237,10 +205,78 @@ export function formatRupiah(number) {
 }
 
 // ==========================================
-// 7. NAVIGASI UTAMA & SUB-PAGE (DENGAN LIFECYCLE HOOKS)
+// 7. PWA INSTALLER & HARD UPDATE SYSTEM
+// ==========================================
+export async function forceUpdateAndClearCache() {
+  const confirmUpdate = await showCustomConfirm(
+    "Perbarui Sistem",
+    "Aplikasi akan menghapus seluruh data cache lama, memperbarui modul, dan memuat ulang sistem terbaru. Lanjutkan?"
+  );
+  if (!confirmUpdate) return;
+
+  showLoading();
+
+  try {
+    if ('caches' in window) {
+      const cacheKeys = await caches.keys();
+      await Promise.all(cacheKeys.map(k => caches.delete(k)));
+    }
+
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (const reg of registrations) {
+        await reg.unregister();
+      }
+    }
+
+    setTimeout(() => {
+      window.location.href = window.location.origin + window.location.pathname + '?v=' + Date.now();
+    }, 600);
+  } catch (err) {
+    hideLoading();
+    notify("Gagal Update", err.message);
+  }
+}
+
+export async function triggerPWAInstall() {
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  if (isStandalone) {
+    return notify("Informasi", "Aplikasi Myaiwa sudah terpasang dan berjalan dalam mode aplikasi mandiri.");
+  }
+
+  if (state.deferredPWAInstallPrompt) {
+    state.deferredPWAInstallPrompt.prompt();
+    const { outcome } = await state.deferredPWAInstallPrompt.userChoice;
+    state.deferredPWAInstallPrompt = null;
+    if (outcome === 'accepted') {
+      notify("Berhasil", "Terima kasih! Aplikasi Myaiwa sedang dipasang ke perangkat Anda.");
+    }
+    return;
+  }
+
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  if (isIOS) {
+    return notify(
+      "Pasang di iPhone / iPad",
+      "1. Tekan tombol 'Bagikan' (Share icon berbentuk kotak panah atas) di browser Safari Anda.\n2. Gulir ke bawah lalu pilih 'Tambah ke Layar Utama' (Add to Home Screen)."
+    );
+  }
+
+  notify(
+    "Pasang Aplikasi",
+    "Gunakan opsi menu browser Anda (titik tiga di pojok kanan atas) lalu pilih 'Install App' atau 'Tambahkan ke Layar Utama'."
+  );
+}
+
+// ==========================================
+// 8. NAVIGASI UTAMA & SUB-PAGE (LIFECYCLE HOOKS)
 // ==========================================
 export function navigateToTab(tabName, pushState = true) {
   if (pushState) history.pushState({ tab: tabName, subpage: null }, "");
+
+  if (state.currentActiveTab === 'absensi' && tabName !== 'absensi' && window.cleanupMapLibre) {
+    window.cleanupMapLibre();
+  }
 
   state.currentActiveTab = tabName;
   document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
@@ -253,12 +289,18 @@ export function navigateToTab(tabName, pushState = true) {
     // Lifecycle Triggers
     if (tabName === 'absensi' && window.initMapLibre) {
       setTimeout(window.initMapLibre, 150);
+    } else if (tabName === 'accounting') {
+      if (window.initKPIReportTab) {
+        window.initKPIReportTab();
+      } else if (window.calculateUserKPI && auth.currentUser) {
+        window.calculateUserKPI(auth.currentUser.uid);
+      }
     } else if (tabName === 'it' && window.initITPanel) {
       window.initITPanel();
     } else if (tabName === 'salary-history-page' && window.renderUserSlipHistory) {
       window.renderUserSlipHistory();
-    } else if (tabName === 'kasbon' && window.loadKasbonAccountSummary) {
-      window.loadKasbonAccountSummary();
+    } else if (tabName === 'gaji') {
+      closeFinanceSubPage(false);
     } else if (tabName === 'tugas' && window.loadDailyTaskChecklist) {
       window.loadDailyTaskChecklist();
     }
@@ -269,8 +311,31 @@ export function navigateToTab(tabName, pushState = true) {
 
   if (tabName !== 'hr') closeHRSubPage(false);
   if (tabName !== 'it') closeITSubPage(false);
+  if (tabName !== 'gaji') closeFinanceSubPage(false);
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+export function openFinanceSubPage(subpageId, pushState = true) {
+  state.isFinanceSubpageOpen = true;
+  if (pushState) history.pushState({ tab: 'gaji', subpage: subpageId }, "");
+
+  document.getElementById('finance-menu-grid-view')?.classList.add('hidden');
+  document.getElementById('finance-subpage-detail-view')?.classList.remove('hidden');
+
+  if (subpageId === 'finance-kasbon' && window.loadKasbonAccountSummary) {
+    window.loadKasbonAccountSummary();
+  }
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+export function closeFinanceSubPage(popHistory = true) {
+  state.isFinanceSubpageOpen = false;
+  document.getElementById('finance-subpage-detail-view')?.classList.add('hidden');
+  document.getElementById('finance-menu-grid-view')?.classList.remove('hidden');
+
+  if (popHistory && history.state && history.state.subpage) history.back();
 }
 
 export function openHRSubPage(subpageId, pushState = true) {
@@ -339,7 +404,7 @@ export function closeITSubPage(popHistory = true) {
 }
 
 // ==========================================
-// 8. POPSTATE HANDLER (TOMBOL BACK FISIK DEVICE & MODAL CLOSER)
+// 9. HIERARCHICAL DEVICE BACK SYSTEM (POPSTATE)
 // ==========================================
 export function showExitToast() {
   const toast = document.getElementById('toast-exit');
@@ -356,45 +421,72 @@ export function initPopStateHandler() {
   history.replaceState({ tab: 'beranda', subpage: null }, "");
 
   window.addEventListener('popstate', () => {
-    // 1. Tutup modal overlay jika aktif
+    // 1. TUTUP MODAL / POPUP AKTIF JIKA ADA
     if (document.getElementById('edit-attendance-modal')?.classList.contains('hidden') === false) {
       document.getElementById('edit-attendance-modal')?.classList.add('hidden');
+      history.pushState({ tab: state.currentActiveTab, subpage: null }, "");
       return;
     }
-    if (document.getElementById('kpi-cert-modal')?.classList.contains('hidden') === false) {
-      document.getElementById('kpi-cert-modal')?.classList.add('hidden');
-      return;
-    }
-    if (document.getElementById('gm-scanner-modal')?.classList.contains('hidden') === false) {
-      if (window.closeGMScannerModal) window.closeGMScannerModal();
-      else document.getElementById('gm-scanner-modal')?.classList.add('hidden');
+    if (document.getElementById('crosscheck-modal')?.classList.contains('hidden') === false) {
+      document.getElementById('crosscheck-modal')?.classList.add('hidden');
+      history.pushState({ tab: state.currentActiveTab, subpage: null }, "");
       return;
     }
     if (document.getElementById('qr-receipt-modal')?.classList.contains('hidden') === false) {
       if (window.closeQRReceiptModal) window.closeQRReceiptModal();
       else document.getElementById('qr-receipt-modal')?.classList.add('hidden');
-      return;
-    }
-    if (document.getElementById('qris-kasbon-modal')?.classList.contains('hidden') === false) {
-      if (window.closeKasbonQRISModal) window.closeKasbonQRISModal();
-      else document.getElementById('qris-kasbon-modal')?.classList.add('hidden');
+      history.pushState({ tab: state.currentActiveTab, subpage: null }, "");
       return;
     }
     if (document.getElementById('share-options-modal')?.classList.contains('hidden') === false) {
       if (window.closeShareOptionsModal) window.closeShareOptionsModal();
       else document.getElementById('share-options-modal')?.classList.add('hidden');
+      history.pushState({ tab: state.currentActiveTab, subpage: null }, "");
       return;
     }
     if (document.getElementById('crop-modal')?.classList.contains('hidden') === false) {
       document.getElementById('crop-modal')?.classList.add('hidden');
+      history.pushState({ tab: state.currentActiveTab, subpage: null }, "");
       return;
     }
-    if (document.getElementById('custom-modal')?.classList.contains('hidden') === false || document.getElementById('custom-modal-overlay')?.classList.contains('hidden') === false) {
+    if (document.getElementById('custom-modal')?.classList.contains('hidden') === false || document.getElementById('confirm-modal')?.classList.contains('hidden') === false) {
       closeModal();
+      history.pushState({ tab: state.currentActiveTab, subpage: null }, "");
       return;
     }
 
-    // 2. Navigasi kembali dari Employee Picker Page ke sub-halaman pemanggil
+    // 2. SUB-PAGE KASBON DALAM MODUL FINANCE -> KEMBALI KE GRID MENU FINANCE
+    if (state.isFinanceSubpageOpen) {
+      closeFinanceSubPage(false);
+      return;
+    }
+
+    // 3. LAMAN SERTIFIKAT KPI FULL-PAGE -> KEMBALI KE LAPORAN KPI
+    if (state.currentActiveTab === 'kpi-cert-page') {
+      navigateToTab('accounting', false);
+      return;
+    }
+
+    // 4. LAMAN SCANNER QR FULL-PAGE -> HENTIKAN KAMERA & KEMBALI KE DAFTAR PENGAJUAN
+    if (state.currentActiveTab === 'gm-scanner-page') {
+      if (state.html5QrScanner) {
+        state.html5QrScanner.stop().catch(() => {}).finally(() => {
+          state.html5QrScanner = null;
+        });
+      }
+      navigateToTab('hr', false);
+      openHRSubPage('hr-requests', false);
+      return;
+    }
+
+    // 5. LAMAN DETAIL KASBON FULL-PAGE -> KEMBALI KE DAFTAR PENGAJUAN
+    if (state.currentActiveTab === 'kasbon-detail-page') {
+      navigateToTab('hr', false);
+      openHRSubPage('hr-requests', false);
+      return;
+    }
+
+    // 6. LAMAN PEMILIH KARYAWAN -> KEMBALI KE SUBPAGE PEMANGGIL
     if (state.currentActiveTab === 'employee-picker-page') {
       navigateToTab('hr', false);
       if (state.activePickerContext === 'shift') openHRSubPage('hr-shift', false);
@@ -405,7 +497,7 @@ export function initPopStateHandler() {
       return;
     }
 
-    // 3. Form Parameter Role -> Menu Pilihan Role
+    // 7. SUB-SUBPAGE DALAM MODUL HR
     const roleParamForm = document.getElementById('subtab-hr-role-param-form');
     if (state.isHRSubpageOpen && roleParamForm && !roleParamForm.classList.contains('hidden')) {
       document.querySelectorAll('.hr-feature-page').forEach(el => el.classList.add('hidden'));
@@ -413,47 +505,67 @@ export function initPopStateHandler() {
       return;
     }
 
-    // 4. Form Manual Attendance -> Log Absensi GM
     const manualAttSubPage = document.getElementById('subtab-hr-manual-attendance');
     if (state.isHRSubpageOpen && manualAttSubPage && !manualAttSubPage.classList.contains('hidden')) {
       openHRSubPage('hr-attendance', false);
       return;
     }
 
-    // 5. Sub-Menu HR -> Grid Menu HR
+    // 8. SUB-PAGES MODUL HR -> KEMBALI KE GRID MENU HR
     if (state.isHRSubpageOpen) {
       closeHRSubPage(false);
       return;
     }
 
-    // 6. Sub-Menu IT -> Grid Menu IT
+    // 9. SUB-PAGES MODUL IT -> KEMBALI KE GRID MENU IT
     if (state.isITSubpageOpen) {
       closeITSubPage(false);
       return;
     }
 
-    // 7. Sub-halaman Umum
+    // 10. LAMAN UBAH PASSWORD -> KEMBALI KE PROFIL
+    if (state.currentActiveTab === 'change-pass') {
+      navigateToTab('profile', false);
+      return;
+    }
+
+    // 11. FORMULIR PULANG AWAL & CUTI -> KEMBALI KE ABSENSI
+    if (state.currentActiveTab === 'early-leave-form' || state.currentActiveTab === 'leave-form') {
+      navigateToTab('absensi', false);
+      return;
+    }
+
+    // 12. LAMAN PENUH QRIS KASBON -> KEMBALI KE SUB-PAGE KASBON
+    if (state.currentActiveTab === 'qris-kasbon-page') {
+      if (state.qrCountdownInterval) clearInterval(state.qrCountdownInterval);
+      navigateToTab('gaji', false);
+      openFinanceSubPage('finance-kasbon', false);
+      return;
+    }
+
+    // 13. ALUR GAJI & SLIP
     if (state.currentActiveTab === 'claim-salary') {
       navigateToTab('payslip-page', false);
       return;
     }
-
     if (state.currentActiveTab === 'payslip-page' || state.currentActiveTab === 'salary-history-page') {
       navigateToTab('gaji', false);
       return;
     }
 
-    if (state.currentActiveTab === 'gaji' || state.currentActiveTab === 'tugas' || state.currentActiveTab === 'kasbon' || state.currentActiveTab === 'leave-form' || state.currentActiveTab === 'employee-request-page' || state.currentActiveTab === 'change-pass' || state.currentActiveTab === 'early-leave-form') {
+    // 14. FORMULIR PENGAJUAN STAF UMUM -> KEMBALI KE BERANDA
+    if (state.currentActiveTab === 'employee-request-page') {
       navigateToTab('beranda', false);
       return;
     }
 
+    // 15. DARI TAB UTAMA LAINNYA -> KEMBALI KE BERANDA (HOME)
     if (state.currentActiveTab !== 'beranda') {
       navigateToTab('beranda', false);
       return;
     }
 
-    // 8. Double-press back untuk keluar aplikasi di tab Beranda
+    // 16. ROOT (BERANDA) -> DOUBLE TAP BACK UNTUK KELUAR
     const now = Date.now();
     if (now - (state.lastBackPressTime || 0) < 2000) {
       history.back();

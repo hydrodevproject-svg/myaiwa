@@ -26,7 +26,13 @@ export const CAREER_ALLOWANCE_PRESETS = {
   Lead: 750000
 };
 
-// 4. TEMPLATE SOP KERJA TOKO BAHAN KUE (AIWA RAGIN JAJE)
+// 4. PRESET TERMIN PENGGAJIAN
+export const PAYROLL_TERMS = {
+  termin_1: { id: "termin_1", name: "Termin 1 (Tanggal 1)", day: 1, label: "Termin 1 (Tgl 1)" },
+  termin_2: { id: "termin_2", name: "Termin 2 (Tanggal 15)", day: 15, label: "Termin 2 (Tgl 15)" }
+};
+
+// 5. TEMPLATE SOP KERJA TOKO BAHAN KUE (AIWA RAGIN JAJE)
 export const ROLE_DEFAULT_SOP = {
   staff: [
     "Cek kebersihan etalase, rak display, dan wadah repack bahan kue",
@@ -60,7 +66,7 @@ export const ROLE_DEFAULT_SOP = {
   ]
 };
 
-// 5. PARAMETER ROLE DEFAULT
+// 6. PARAMETER ROLE DEFAULT
 export const DEFAULT_ROLE_PARAMS = {
   staff: { pagi_start: "07:30", pagi_end: "15:30", malam_start: "13:30", malam_end: "21:00", it_threshold: "10:00", tolerance: 15, late_penalty: 10000, overtime_rate: 25000, radius_meter: 100 },
   admin: { pagi_start: "08:00", pagi_end: "16:00", malam_start: "13:30", malam_end: "21:00", it_threshold: "10:00", tolerance: 15, late_penalty: 10000, overtime_rate: 25000, radius_meter: 100 },
@@ -69,7 +75,7 @@ export const DEFAULT_ROLE_PARAMS = {
   gm: { pagi_start: "08:00", pagi_end: "17:00", malam_start: "13:30", malam_end: "21:00", it_threshold: "10:00", tolerance: 30, late_penalty: 0, overtime_rate: 0, radius_meter: 200 }
 };
 
-// 6. DEFAULT WEEKLY ROSTER FOR STAFF OUTLET (1 HARI LIBUR)
+// 7. DEFAULT WEEKLY ROSTER FOR STAFF OUTLET (1 HARI LIBUR)
 export const DEFAULT_STAFF_WEEKLY_ROSTER = {
   senin: "pagi",
   selasa: "pagi",
@@ -80,13 +86,13 @@ export const DEFAULT_STAFF_WEEKLY_ROSTER = {
   minggu: "libur"
 };
 
-// 7. MONOTONE ICONS
+// 8. MONOTONE ICONS
 export const MONOTONE_ICONS = {
   warning: '<svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>',
   location: '<svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a8 8 0 00-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 00-8-8zm0 11a3 3 0 110-6 3 3 0 010 6z"/></svg>'
 };
 
-// 8. SHARED RUNTIME STATE & CACHES
+// 9. SHARED RUNTIME STATE & CACHES
 export const state = {
   itUsersCache: [],
   allEmployeesCache: [],
@@ -113,6 +119,7 @@ export const state = {
   currentActiveTab: "beranda",
   isHRSubpageOpen: false,
   isITSubpageOpen: false,
+  isFinanceSubpageOpen: false,
   lastBackPressTime: 0,
   pendingLeaveType: "Sakit",
   pendingEmployeeRequestType: "Kasbon",

@@ -29,8 +29,8 @@ import {
   applyUserAvatar, 
   navigateToTab 
 } from "./utils.js";
+import { cleanupAttendanceListeners } from "./attendance.js";
 
-// Variabel penampung unsubscribe listener realtime
 let unsubscribeUserSnapshot = null;
 let unsubscribeRoleParamsSnapshot = null;
 
@@ -104,10 +104,8 @@ export function initAuthObserver(onUserLoadedCallback) {
       document.getElementById("dashboard-user-name").innerText = user.email?.split('@')[0] || "Karyawan";
       document.getElementById("dashboard-greeting").innerText = getDynamicGreeting();
 
-      // Aktifkan listener parameter toko realtime
       initRealtimeSystemParameters();
 
-      // Pasang Listener Realtime pada Dokumen Pengguna (users/{uid})
       if (unsubscribeUserSnapshot) unsubscribeUserSnapshot();
 
       unsubscribeUserSnapshot = onSnapshot(doc(db, "users", user.uid), async (userDoc) => {
@@ -165,9 +163,9 @@ export function initAuthObserver(onUserLoadedCallback) {
       });
 
     } else {
-      // Bersihkan listener aktif saat keluar
       if (unsubscribeUserSnapshot) { unsubscribeUserSnapshot(); unsubscribeUserSnapshot = null; }
       if (unsubscribeRoleParamsSnapshot) { unsubscribeRoleParamsSnapshot(); unsubscribeRoleParamsSnapshot = null; }
+      cleanupAttendanceListeners();
 
       state.currentUserData = null;
       sectionLogin?.classList.remove("hidden");
@@ -215,6 +213,7 @@ export async function triggerLogout() {
     try {
       if (unsubscribeUserSnapshot) { unsubscribeUserSnapshot(); unsubscribeUserSnapshot = null; }
       if (unsubscribeRoleParamsSnapshot) { unsubscribeRoleParamsSnapshot(); unsubscribeRoleParamsSnapshot = null; }
+      cleanupAttendanceListeners();
       await signOut(auth);
     } finally {
       hideLoading();
@@ -223,7 +222,7 @@ export async function triggerLogout() {
 }
 
 // ==========================================
-// 4. MENU AKSI CEPAT DASHBOARD PER ROLE
+// 4. MENU AKSI CEPAT DASHBOARD (MENU FINANCE TERPUSAT)
 // ==========================================
 export function renderRoleQuickActions(role) {
   const container = document.getElementById("dashboard-role-actions");
@@ -252,23 +251,28 @@ export function renderRoleQuickActions(role) {
     </div>
   `;
 
-  const cardGaji = `
-    <div class="hr-icon-card" onclick="navigateToTab('gaji')">
-      <div class="hr-icon-bubble bg-soft-mint">
-        <svg class="icon-inline" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><line x1="12" y1="6" x2="12" y2="8"/><line x1="12" y1="16" x2="12" y2="18"/></svg>
+  const cardLaporan = `
+    <div class="hr-icon-card" onclick="navigateToTab('accounting')">
+      <div class="hr-icon-bubble bg-soft-amber">
+        <svg class="icon-inline" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg>
       </div>
-      <strong>Gaji</strong>
-      <small>Slip & Riwayat</small>
+      <strong>Laporan KPI</strong>
+      <small>Evaluasi & Nilai</small>
     </div>
   `;
 
-  const cardKasbon = `
-    <div class="hr-icon-card" onclick="navigateToTab('kasbon')">
-      <div class="hr-icon-bubble bg-soft-amber">
-        <svg class="icon-inline" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+  const cardFinance = `
+    <div class="hr-icon-card" onclick="navigateToTab('gaji')">
+      <div class="hr-icon-bubble bg-soft-mint">
+        <svg class="icon-inline" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/>
+          <line x1="12" y1="6" x2="12" y2="8"/>
+          <line x1="12" y1="16" x2="12" y2="18"/>
+        </svg>
       </div>
-      <strong>Kasbon</strong>
-      <small>Pinjam & Bayar</small>
+      <strong>Finance</strong>
+      <small>Gaji & Kasbon</small>
     </div>
   `;
 
@@ -283,22 +287,12 @@ export function renderRoleQuickActions(role) {
   `;
 
   const cardHR = `
-    <div class="hr-icon-card" onclick="navigateToTab('hr')">
+    <div class="hr-icon-card" onclick="openHRSubPage ? navigateToTab('hr') : null">
       <div class="hr-icon-bubble bg-tiktok-cyan">
         <svg class="icon-inline" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       </div>
       <strong>Modul HR</strong>
       <small>Shift & Parameter</small>
-    </div>
-  `;
-
-  const cardLaporan = `
-    <div class="hr-icon-card" onclick="navigateToTab('accounting')">
-      <div class="hr-icon-bubble bg-soft-amber">
-        <svg class="icon-inline" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg>
-      </div>
-      <strong>Laporan KPI</strong>
-      <small>Finalisasi & Cert</small>
     </div>
   `;
 
@@ -325,19 +319,19 @@ export function renderRoleQuickActions(role) {
   switch (role) {
     case "staff":
     case "logistik":
-      container.innerHTML = cardTugas + cardAbsen + cardGaji + cardKasbon + cardCuti;
+      container.innerHTML = cardTugas + cardAbsen + cardLaporan + cardFinance + cardCuti;
       break;
     case "admin":
-      container.innerHTML = cardTugas + cardHR + cardLaporan + cardAbsen + cardGaji + cardKasbon + cardCuti;
+      container.innerHTML = cardTugas + cardHR + cardLaporan + cardAbsen + cardFinance + cardCuti;
       break;
     case "gm":
-      container.innerHTML = cardTugas + cardHR + cardLaporan + cardRecruitment + cardAbsen + cardGaji + cardKasbon + cardCuti;
+      container.innerHTML = cardTugas + cardHR + cardLaporan + cardRecruitment + cardAbsen + cardFinance + cardCuti;
       break;
     case "it":
-      container.innerHTML = cardTugas + cardIT + cardHR + cardLaporan + cardAbsen + cardGaji + cardKasbon;
+      container.innerHTML = cardTugas + cardIT + cardHR + cardLaporan + cardAbsen + cardFinance;
       break;
     default:
-      container.innerHTML = cardTugas + cardAbsen + cardGaji + cardKasbon + cardCuti;
+      container.innerHTML = cardTugas + cardAbsen + cardLaporan + cardFinance + cardCuti;
   }
 }
 
@@ -471,6 +465,7 @@ export async function createUserAccount(name, email, pass, role) {
       shift: role === "it" ? "it_flex" : "pagi",
       work_mode: role === "it" ? "wfa" : "wfo",
       career_level: "Junior",
+      payroll_term: "termin_1",
       created_at: serverTimestamp()
     });
     await signOut(secondaryAuth);
@@ -498,6 +493,7 @@ export async function createITUserAccount(name, email, pass, role) {
       shift: role === "it" ? "it_flex" : "pagi",
       work_mode: role === "it" ? "wfa" : "wfo",
       career_level: "Junior",
+      payroll_term: "termin_1",
       created_at: serverTimestamp()
     });
     await signOut(secondaryAuth);
