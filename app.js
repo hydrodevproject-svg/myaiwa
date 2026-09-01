@@ -40,22 +40,27 @@ const publicActions = {
   triggerLogout: Auth.triggerLogout,
   openCropperModal: Auth.openCropperModal,
 
-  // Absensi & GPS
+  // Absensi & GPS (Lengkap dengan Handler Form & Modal)
   refreshMapLibreGPS: Attendance.refreshMapLibreGPS,
   executeGPSAttendance: Attendance.executeGPSAttendance,
   openLeaveFormPage: Attendance.openLeaveFormPage,
   openManualAttendancePage: Attendance.openManualAttendancePage,
+  saveManualAttendance: Attendance.saveManualAttendance,
   selectReportPeriodType: Attendance.selectReportPeriodType,
   openTargetUserPicker: Attendance.openTargetUserPicker,
   generateAdminAttendanceReport: Attendance.generateAdminAttendanceReport,
   openEditAttendanceModal: Attendance.openEditAttendanceModal,
   closeEditAttendanceModal: Attendance.closeEditAttendanceModal,
+  saveEditedAttendance: Attendance.saveEditedAttendance,
   deleteAttendanceRecord: Attendance.deleteAttendanceRecord,
+  openEarlyLeavePage: Attendance.openEarlyLeavePage,
   selectEarlyLeaveCategory: Attendance.selectEarlyLeaveCategory,
+  submitEarlyLeaveRequest: Attendance.submitEarlyLeaveRequest,
   calculateLeaveDays: Attendance.calculateLeaveDays,
   initMapLibre: Attendance.initMapLibre,
   cleanupMapLibre: Attendance.cleanupMapLibre,
   checkTodayAttendance: Attendance.checkTodayAttendance,
+  populateReportUserDropdown: Attendance.populateReportUserDropdown,
 
   // Tugas & KPI
   submitDailyTasksFinal: TasksKPI.submitDailyTasksFinal,
@@ -121,7 +126,6 @@ const publicActions = {
   saveAssignedShift: HR.saveAssignedShift,
   loadHRUserOptions: HR.loadHRUserOptions,
   loadCareerPathList: HR.loadCareerPathList,
-  populateReportUserDropdown: Attendance.populateReportUserDropdown,
 
   // IT System
   initITPanel: IT.initITPanel,
