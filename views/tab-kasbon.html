@@ -1,95 +1,13 @@
 <!-- ==========================================================================
-     VIEWS/TAB-KASBON.HTML - MODUL KASBON & SETOR PINJAMAN (UNIFIED CARD)
+     VIEWS/TAB-KASBON.HTML - STANDALONE COMPONENT (REDIRECTS TO FINANCE)
      MYAIWA - AIWA RAGIN JAJE SYSTEM
      ========================================================================== -->
 
 <div id="tab-kasbon" class="tab-content hidden">
-
-  <!-- 1. UNIFIED KASBON HERO CARD (GRADASI HIJAU) -->
-  <div class="card kasbon-hero-gradient-card mb-2">
-    <div class="sheet-section-title mb-1">
-      <span class="text-uppercase-label font-700" style="color: #10b981;">SALDO PINJAMAN KASBON</span>
-      <span class="badge-status-work" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">AKTIF</span>
-    </div>
-
-    <small class="instruction-note" style="margin-top: 0;">SISA KASBON SAAT INI</small>
-    <strong id="kasbon-current-balance-display" class="kasbon-main-amount">Rp 0</strong>
-
-    <div class="grid-2 gap-sm mt-2 mb-3">
-      <div class="time-stat-pill text-left kasbon-stat-pill">
-        <small>Total Pernah Diajukan</small>
-        <strong id="kasbon-total-borrowed-display">Rp 0</strong>
-      </div>
-      <div class="time-stat-pill text-left kasbon-stat-pill">
-        <small>Sudah Dilunasi / Dipotong</small>
-        <strong id="kasbon-total-repaid-display" class="text-db-status">Rp 0</strong>
-      </div>
-    </div>
-
-    <!-- TOMBOL AKSI MENYATU (IKON TELAH DIHILANGKAN) -->
-    <div class="grid-2 gap-sm">
-      <button type="button" class="btn-primary" onclick="openKasbonForm('pinjam')">
-        <span>Ajukan Kasbon</span>
-      </button>
-
-      <button type="button" class="btn-kasbon-dark" onclick="openKasbonForm('bayar')">
-        <span>Setor Kasbon</span>
-      </button>
-    </div>
+  <div class="card text-center" style="padding: 2rem 1rem;">
+    <p class="placeholder-text">Modul Kasbon telah dipindahkan ke menu <b>Finance</b>.</p>
+    <button type="button" class="btn-primary mt-2" onclick="navigateToTab('gaji')">
+      Buka Menu Finance
+    </button>
   </div>
-
-  <!-- 2. FORMULIR PENGAJUAN PINJAM / SETOR KASBON -->
-  <div id="box-form-kasbon" class="card mb-2 hidden">
-    <div class="sheet-section-title mb-2">
-      <span class="text-uppercase-label font-700" id="kasbon-form-title">Formulir Pengajuan Kasbon</span>
-      <span class="badge-status-work" id="kasbon-form-badge">TRANSAKSI</span>
-    </div>
-
-    <form id="form-transaksi-kasbon">
-      <input type="hidden" id="kasbon-action-type" value="pinjam">
-
-      <div class="form-group mb-2">
-        <label id="kasbon-amount-label">NOMINAL PINJAMAN (RP)</label>
-        <input type="number" id="kasbon-amount-input" required min="10000" placeholder="Contoh: 500000" oninput="calculateKasbonInstallment()">
-      </div>
-
-      <!-- Pilihan Tenor (Otomatis disembunyikan saat Setor Kasbon) -->
-      <div id="box-kasbon-tenor-wrapper" class="grid-2 gap-sm mb-2">
-        <div class="form-group mb-0">
-          <label>PILIHAN TENOR</label>
-          <select id="kasbon-tenor-months" onchange="calculateKasbonInstallment()">
-            <option value="1">1 Bulan (Lunas Langsung)</option>
-            <option value="2">2 Bulan (2x Potong Gaji)</option>
-            <option value="3">3 Bulan (3x Potong Gaji)</option>
-          </select>
-        </div>
-        <div class="form-group mb-0">
-          <label>CICILAN / BULAN (RP)</label>
-          <input type="text" id="kasbon-monthly-installment" class="readonly-display" readonly value="Rp 0">
-        </div>
-      </div>
-
-      <div class="form-group mb-3">
-        <label>KEPERLUAN / KETERANGAN</label>
-        <textarea id="kasbon-notes-input" class="custom-textarea" rows="2" required placeholder="Tuliskan keterangan keperluan..."></textarea>
-      </div>
-
-      <div class="grid-2 gap-sm mt-3">
-        <button type="submit" id="btn-submit-kasbon-form" class="btn-primary">Kirimkan Pengajuan</button>
-        <button type="button" class="btn-secondary-line" onclick="closeKasbonForm()">Batal</button>
-      </div>
-    </form>
-  </div>
-
-  <!-- 3. RIWAYAT & MUTASI KASBON AKUN -->
-  <div class="card">
-    <div class="sheet-section-title mb-2">
-      <span class="text-uppercase-label font-700">Riwayat & Mutasi Kasbon Akun</span>
-    </div>
-
-    <div id="kasbon-history-list" class="picker-list-scroll max-h-280">
-      <p class="placeholder-text">Belum ada transaksi kasbon.</p>
-    </div>
-  </div>
-
 </div>
