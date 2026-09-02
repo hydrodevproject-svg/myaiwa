@@ -1,12 +1,12 @@
 /**
  * SERVICE WORKER ENGINE - MYAIWA PWA
  * AIWA RAGIN JAJE SYSTEM
- * Version: v2.5.0 (Full Offline Precache & Cache-First Strategy)
+ * Version: v2.6.0 (Full Offline Precache & Seamless Cache Strategy)
  */
 
-const CACHE_NAME = 'myaiwa-v2.5.0';
+const CACHE_NAME = 'myaiwa-v2.6.0';
 
-// DAFTAR SELURUH ASET STATIS & DINAMIS UNTUK CACHE OFFLINE PENUH
+// DAFTAR LENGKAP BERKAS STATIS INTERNAL APLIKASI
 const PRECACHE_ASSETS = [
   // 1. Root & App Shell
   './',
@@ -15,8 +15,6 @@ const PRECACHE_ASSETS = [
   './app.js',
   './firebase-config.js',
   './manifest.json',
-  './icon-192.png',
-  './icon-512.png',
 
   // 2. Modular Stylesheets (Folder css/)
   './css/01-variables.css',
@@ -80,11 +78,10 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// 3. EVENT FETCH: Cache-First dengan Network Fallback
+// 3. EVENT FETCH: Cache-First dengan Stale-While-Revalidate
 self.addEventListener('fetch', (event) => {
   const url = event.request.url;
 
-  // Lewatkan request API eksternal, Firebase, Map Tiles, dan CDN dynamic
   if (
     url.includes('firestore.googleapis.com') ||
     url.includes('identitytoolkit.googleapis.com') ||
@@ -92,6 +89,7 @@ self.addEventListener('fetch', (event) => {
     url.includes('demotiles.maplibre.org') ||
     url.includes('basemaps.cartocdn.com') ||
     url.includes('tile.openstreetmap.org') ||
+    url.includes('openfreemap.org') ||
     url.includes('unpkg.com') ||
     url.includes('cdnjs.cloudflare.com') ||
     url.includes('cdn.jsdelivr.net') ||
@@ -101,11 +99,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Strategi Cache-First untuk file internal aplikasi
   event.respondWith(
     caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
       if (cachedResponse) {
-        // Ambil update di background (Stale-While-Revalidate) jika online
         fetch(event.request).then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
             caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
@@ -114,7 +110,6 @@ self.addEventListener('fetch', (event) => {
         return cachedResponse;
       }
 
-      // Ambil dari jaringan jika tidak ada di cache
       return fetch(event.request).then((networkResponse) => {
         if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
           return networkResponse;
