@@ -64,20 +64,14 @@ function formatShortDateTime(millis) {
 }
 
 // ==========================================
-// 1. KOMPILASI SLIP GAJI (BEBAS COMPOSITE INDEX)
+// 1. KOMPILASI SLIP GAJI
 // ==========================================
 export async function compileEmployeeSlip(userId, monthStr, customTerm = null) {
   const [userDoc, salDoc, attSnap, reqSnap] = await Promise.all([
     getDoc(doc(db, "users", userId)),
     getDoc(doc(db, "salary_structures", userId)),
-    getDocs(query(
-      collection(db, "attendance"),
-      where("uid", "==", userId)
-    )),
-    getDocs(query(
-      collection(db, "employee_requests"), 
-      where("uid", "==", userId)
-    ))
+    getDocs(query(collection(db, "attendance"), where("uid", "==", userId))),
+    getDocs(query(collection(db, "employee_requests"), where("uid", "==", userId)))
   ]);
 
   const userData = userDoc.exists() ? userDoc.data() : {};
@@ -760,7 +754,7 @@ export async function loadKasbonAccountSummary() {
           hasExpiredBatch = true;
         }
 
-        // Auto-Delete Rejected dalam 1 Menit
+        // Auto-Delete Rejected yang sudah lewat 60 detik dari DB
         if (item.status === "Rejected") {
           const deleteAt = (item.rejected_at_millis || item.requested_millis || now) + 60000;
           if (now >= deleteAt) {
@@ -788,7 +782,7 @@ export async function loadKasbonAccountSummary() {
     const sisaKasbon = Math.max(0, totalPinjaman - totalPelunasan);
     state.currentUserKasbonBalance = sisaKasbon;
 
-    // HAPUS PERMANEN DOKUMEN JIKA SALDO LUNAS TOTAL
+    // HAPUS PERMANEN DARI DB JIKA SUDAH LUNAS TOTAL
     if (sisaKasbon === 0 && totalPinjaman > 0) {
       const cleanupBatch = writeBatch(db);
       let countDeleted = 0;
@@ -824,6 +818,7 @@ export async function loadKasbonAccountSummary() {
 
     if (transactions.length === 0) {
       historyList.innerHTML = "<p class='placeholder-text'>Belum ada transaksi kasbon aktif.</p>";
+      if (kasbonHistoryCountdownTimer) clearInterval(kasbonHistoryCountdownTimer);
       return;
     }
 
@@ -841,6 +836,7 @@ export async function loadKasbonAccountSummary() {
       let badgeColor = "#10b981";
       let statusLabel = t.status.toUpperCase();
 
+      let cdAttr = "";
       if (isPending) {
         badgeBg = "rgba(245, 158, 11, 0.15)";
         badgeColor = "#f59e0b";
@@ -850,6 +846,7 @@ export async function loadKasbonAccountSummary() {
         const deleteAt = (t.rejected_at_millis || t.requested_millis || Date.now()) + 60000;
         const remainSec = Math.max(0, Math.ceil((deleteAt - Date.now()) / 1000));
         statusLabel = `REJECTED (${remainSec}s)`;
+        cdAttr = `data-countdown-expire="${deleteAt}" data-doc-id="${t.id}"`;
       } else if (t.status === "Expired") {
         badgeBg = "rgba(239, 68, 68, 0.15)";
         badgeColor = "#ef4444";
@@ -866,7 +863,7 @@ export async function loadKasbonAccountSummary() {
           <div class="picker-user-meta" style="flex:1;">
             <div style="display:flex; align-items:center; gap:6px;">
               <strong>${t.type === "Kasbon" ? "Pinjaman Kasbon" : "Setoran Kasbon"}</strong>
-              <span class="badge-status-work" style="background:${badgeBg}; color:${badgeColor}; font-size:0.52rem; padding:2px 5px;">${statusLabel}</span>
+              <span class="badge-status-work kasbon-status-badge" ${cdAttr} style="background:${badgeBg}; color:${badgeColor}; font-size:0.52rem; padding:2px 5px;">${statusLabel}</span>
             </div>
             <small>${t.note || '-'} · <b style="color:var(--text-primary);">${formattedTime}</b></small>
             ${pendingHint}
@@ -876,10 +873,27 @@ export async function loadKasbonAccountSummary() {
       `;
     }).join("");
 
+    // Interval Live Countdown UI-Only (Bebas Quota Query)
     if (kasbonHistoryCountdownTimer) clearInterval(kasbonHistoryCountdownTimer);
-    if (transactions.some(t => t.status === "Rejected")) {
+    const badges = historyList.querySelectorAll("[data-countdown-expire]");
+    if (badges.length > 0) {
       kasbonHistoryCountdownTimer = setInterval(() => {
-        loadKasbonAccountSummary();
+        const currentTime = Date.now();
+        let anyExpired = false;
+        badges.forEach(b => {
+          const exp = Number(b.getAttribute("data-countdown-expire") || 0);
+          const remain = Math.max(0, Math.ceil((exp - currentTime) / 1000));
+          if (remain > 0) {
+            b.innerText = `REJECTED (${remain}s)`;
+          } else {
+            b.innerText = `EXPIRED`;
+            anyExpired = true;
+          }
+        });
+        if (anyExpired) {
+          clearInterval(kasbonHistoryCountdownTimer);
+          loadKasbonAccountSummary();
+        }
       }, 1000);
     }
 
@@ -1313,6 +1327,7 @@ export async function loadHRRequestsList() {
 
     if (requests.length === 0) {
       listEl.innerHTML = "<p class='placeholder-text'>Tidak ada antrean pengajuan aktif.</p>";
+      if (hrRequestsCountdownTimer) clearInterval(hrRequestsCountdownTimer);
       return;
     }
 
@@ -1327,6 +1342,7 @@ export async function loadHRRequestsList() {
 
       let statusColor = "#f59e0b";
       let statusLabel = item.status;
+      let cdAttr = "";
 
       if (isApproved) {
         statusColor = "#10b981";
@@ -1335,6 +1351,7 @@ export async function loadHRRequestsList() {
         const deleteAt = (item.rejected_at_millis || item.requested_millis || Date.now()) + 60000;
         const remainSec = Math.max(0, Math.ceil((deleteAt - Date.now()) / 1000));
         statusLabel = `Rejected (${remainSec}s)`;
+        cdAttr = `data-countdown-expire="${deleteAt}"`;
       } else if (item.status === "Expired") {
         statusColor = "#ef4444";
       }
@@ -1353,7 +1370,7 @@ export async function loadHRRequestsList() {
             <strong>${item.nama} [${item.type}]</strong>
             <small class="text-muted-xs">${formatRupiah(item.amount || 0)} · ${item.note || ''}</small>
             <small class="mt-1">Waktu: <b style="color:var(--text-primary);">${formattedTime}</b></small>
-            <small>Status: <b style="color:${statusColor}">${statusLabel}</b></small>
+            <small>Status: <b class="hr-req-status-label" ${cdAttr} style="color:${statusColor}">${statusLabel}</b></small>
             ${approvedHint}
           </div>
           <div class="request-action-group">
@@ -1370,10 +1387,27 @@ export async function loadHRRequestsList() {
       `;
     }).join("");
 
+    // Interval Live Countdown UI-Only untuk GM
     if (hrRequestsCountdownTimer) clearInterval(hrRequestsCountdownTimer);
-    if (requests.some(r => r.status === "Rejected")) {
+    const badges = listEl.querySelectorAll("[data-countdown-expire]");
+    if (badges.length > 0) {
       hrRequestsCountdownTimer = setInterval(() => {
-        loadHRRequestsList();
+        const currentTime = Date.now();
+        let anyExpired = false;
+        badges.forEach(b => {
+          const exp = Number(b.getAttribute("data-countdown-expire") || 0);
+          const remain = Math.max(0, Math.ceil((exp - currentTime) / 1000));
+          if (remain > 0) {
+            b.innerText = `Rejected (${remain}s)`;
+          } else {
+            b.innerText = `Expired`;
+            anyExpired = true;
+          }
+        });
+        if (anyExpired) {
+          clearInterval(hrRequestsCountdownTimer);
+          loadHRRequestsList();
+        }
       }, 1000);
     }
 
