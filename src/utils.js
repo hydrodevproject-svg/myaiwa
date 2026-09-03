@@ -149,14 +149,19 @@ export function applyUserAvatar(base64OrUrl) {
 }
 
 // ==========================================
-// 5. TEMA SISTEM & VISIBILITAS PASSWORD
+// 5. TEMA SISTEM & SINKRONISASI STATUS BAR
 // ==========================================
 export function switchGlobalTheme(theme) {
+  const metaTheme = document.getElementById('meta-theme-color') || document.querySelector('meta[name="theme-color"]');
+  
   if (theme === 'dark') {
     document.body.classList.add('dark-mode');
+    if (metaTheme) metaTheme.setAttribute('content', '#0f172a');
   } else {
     document.body.classList.remove('dark-mode');
+    if (metaTheme) metaTheme.setAttribute('content', '#ffffff');
   }
+  
   localStorage.setItem('myaiwa_theme', theme);
   document.querySelectorAll('#login-theme-light, #profile-theme-light').forEach(b => b.classList.toggle('active-theme', theme === 'light'));
   document.querySelectorAll('#login-theme-dark, #profile-theme-dark').forEach(b => b.classList.toggle('active-theme', theme === 'dark'));
@@ -461,13 +466,20 @@ export function initPopStateHandler() {
       return;
     }
 
-    // 3. LAMAN SERTIFIKAT KPI FULL-PAGE -> KEMBALI KE LAPORAN KPI
+    // 3. LAMAN QR PENCAIRAN GAJI TUNAI -> KEMBALI KE SLIP
+    if (state.currentActiveTab === 'qris-salary-page') {
+      if (window.closeSalaryQRModal) window.closeSalaryQRModal();
+      else navigateToTab('payslip-page', false);
+      return;
+    }
+
+    // 4. LAMAN SERTIFIKAT KPI FULL-PAGE -> KEMBALI KE LAPORAN KPI
     if (state.currentActiveTab === 'kpi-cert-page') {
       navigateToTab('accounting', false);
       return;
     }
 
-    // 4. LAMAN SCANNER QR FULL-PAGE -> HENTIKAN KAMERA & KEMBALI KE DAFTAR PENGAJUAN
+    // 5. LAMAN SCANNER QR FULL-PAGE -> HENTIKAN KAMERA & KEMBALI KE DAFTAR PENGAJUAN
     if (state.currentActiveTab === 'gm-scanner-page') {
       if (state.html5QrScanner) {
         state.html5QrScanner.stop().catch(() => {}).finally(() => {
@@ -479,14 +491,14 @@ export function initPopStateHandler() {
       return;
     }
 
-    // 5. LAMAN DETAIL KASBON FULL-PAGE -> KEMBALI KE DAFTAR PENGAJUAN
+    // 6. LAMAN DETAIL KASBON FULL-PAGE -> KEMBALI KE DAFTAR PENGAJUAN
     if (state.currentActiveTab === 'kasbon-detail-page') {
       navigateToTab('hr', false);
       openHRSubPage('hr-requests', false);
       return;
     }
 
-    // 6. LAMAN PEMILIH KARYAWAN -> KEMBALI KE SUBPAGE PEMANGGIL
+    // 7. LAMAN PEMILIH KARYAWAN -> KEMBALI KE SUBPAGE PEMANGGIL
     if (state.currentActiveTab === 'employee-picker-page') {
       navigateToTab('hr', false);
       if (state.activePickerContext === 'shift') openHRSubPage('hr-shift', false);
@@ -497,7 +509,7 @@ export function initPopStateHandler() {
       return;
     }
 
-    // 7. SUB-SUBPAGE DALAM MODUL HR
+    // 8. SUB-SUBPAGE DALAM MODUL HR
     const roleParamForm = document.getElementById('subtab-hr-role-param-form');
     if (state.isHRSubpageOpen && roleParamForm && !roleParamForm.classList.contains('hidden')) {
       document.querySelectorAll('.hr-feature-page').forEach(el => el.classList.add('hidden'));
@@ -511,31 +523,35 @@ export function initPopStateHandler() {
       return;
     }
 
-    // 8. SUB-PAGES MODUL HR -> KEMBALI KE GRID MENU HR
+    // 9. SUB-PAGES MODUL HR -> KEMBALI KE GRID MENU HR
     if (state.isHRSubpageOpen) {
       closeHRSubPage(false);
       return;
     }
 
-    // 9. SUB-PAGES MODUL IT -> KEMBALI KE GRID MENU IT
+    // 10. SUB-PAGES MODUL IT -> KEMBALI KE GRID MENU IT
     if (state.isITSubpageOpen) {
       closeITSubPage(false);
       return;
     }
 
-    // 10. LAMAN UBAH PASSWORD -> KEMBALI KE PROFIL
+    // 11. LAMAN UBAH PASSWORD -> KEMBALI KE PROFIL
     if (state.currentActiveTab === 'change-pass') {
       navigateToTab('profile', false);
       return;
     }
 
-    // 11. FORMULIR PULANG AWAL & CUTI -> KEMBALI KE ABSENSI
-    if (state.currentActiveTab === 'early-leave-form' || state.currentActiveTab === 'leave-form') {
+    // 12. FORMULIR PULANG AWAL & CUTI -> DINAMIS KEMBALI KE TAB ASAL
+    if (state.currentActiveTab === 'early-leave-form') {
       navigateToTab('absensi', false);
       return;
     }
+    if (state.currentActiveTab === 'leave-form') {
+      navigateToTab(state.leaveFormOriginTab || 'beranda', false);
+      return;
+    }
 
-    // 12. LAMAN PENUH QRIS KASBON -> KEMBALI KE SUB-PAGE KASBON
+    // 13. LAMAN PENUH QRIS KASBON -> KEMBALI KE SUB-PAGE KASBON
     if (state.currentActiveTab === 'qris-kasbon-page') {
       if (state.qrCountdownInterval) clearInterval(state.qrCountdownInterval);
       navigateToTab('gaji', false);
@@ -543,7 +559,7 @@ export function initPopStateHandler() {
       return;
     }
 
-    // 13. ALUR GAJI & SLIP
+    // 14. ALUR GAJI & SLIP
     if (state.currentActiveTab === 'claim-salary') {
       navigateToTab('payslip-page', false);
       return;
@@ -553,19 +569,19 @@ export function initPopStateHandler() {
       return;
     }
 
-    // 14. FORMULIR PENGAJUAN STAF UMUM -> KEMBALI KE BERANDA
+    // 15. FORMULIR PENGAJUAN STAF UMUM -> KEMBALI KE BERANDA
     if (state.currentActiveTab === 'employee-request-page') {
       navigateToTab('beranda', false);
       return;
     }
 
-    // 15. DARI TAB UTAMA LAINNYA -> KEMBALI KE BERANDA (HOME)
+    // 16. DARI TAB UTAMA LAINNYA -> KEMBALI KE BERANDA (HOME)
     if (state.currentActiveTab !== 'beranda') {
       navigateToTab('beranda', false);
       return;
     }
 
-    // 16. ROOT (BERANDA) -> DOUBLE TAP BACK UNTUK KELUAR
+    // 17. ROOT (BERANDA) -> DOUBLE TAP BACK UNTUK KELUAR
     const now = Date.now();
     if (now - (state.lastBackPressTime || 0) < 2000) {
       history.back();
